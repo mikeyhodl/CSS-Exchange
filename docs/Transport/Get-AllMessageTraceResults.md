@@ -2,7 +2,7 @@
 
 Download the latest release: [Get-AllMessageTraceResults.ps1](https://github.com/microsoft/CSS-Exchange/releases/latest/download/Get-AllMessageTraceResults.ps1)
 
-This script provides a wrapper around `Get-MessageTraceV2` that automatically handles pagination to retrieve all matching message trace results from Exchange Online. It collects results in pages of up to 5000 and continues fetching until all results are returned or a timeout is reached.
+This script is a wrapper for the Exchange Online `Get-MessageTraceV2` cmdlet that automatically handles pagination. It requires an active Exchange Online PowerShell session. Results are collected in pages of up to 5000 and fetching continues until all results are returned or a timeout is reached.
 
 ## Parameters
 
@@ -63,20 +63,19 @@ The number of minutes before the script stops fetching additional pages. The def
 Retrieve all messages from the last 7 hours:
 
 ```powershell
-. .\Get-AllMessageTraceResults.ps1
-$messages = Get-AllMessageTraceResults -StartDate (Get-Date).AddHours(-7) -EndDate (Get-Date)
+$messages = .\Get-AllMessageTraceResults.ps1 -StartDate (Get-Date).AddHours(-7) -EndDate (Get-Date)
 ```
 
 Filter by sender and status:
 
 ```powershell
-$messages = Get-AllMessageTraceResults -StartDate (Get-Date).AddHours(-7) -EndDate (Get-Date) -SenderAddress "john@contoso.com" -Status "Delivered"
+$messages = .\Get-AllMessageTraceResults.ps1 -StartDate (Get-Date).AddHours(-7) -EndDate (Get-Date) -SenderAddress "john@contoso.com" -Status "Delivered"
 ```
 
 Filter by recipient with a custom page size:
 
 ```powershell
-$messages = Get-AllMessageTraceResults -StartDate (Get-Date).AddDays(-2) -EndDate (Get-Date) -RecipientAddress "jane@contoso.com" -PageSize 1000
+$messages = .\Get-AllMessageTraceResults.ps1 -StartDate (Get-Date).AddDays(-2) -EndDate (Get-Date) -RecipientAddress "jane@contoso.com" -PageSize 1000
 ```
 
 ## Output
