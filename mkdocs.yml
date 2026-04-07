@@ -143,6 +143,7 @@ nav:
     - SetupLogReviewer: Setup/SetupLogReviewer.md
   - Transport:
     - Compute-TopExoRecipientsFromMessageTrace: Transport/Compute-TopExoRecipientsFromMessageTrace.md
+    - Get-AllMessageTraceResults: Transport/Get-AllMessageTraceResults.md
     - ReplayQueueDatabases: Transport/ReplayQueueDatabases.md
     - Measure-EmailDelayInMTL: Transport/Measure-EmailDelayInMTL.md
 theme:
