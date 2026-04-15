@@ -124,7 +124,7 @@ Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID 
 
 Before analyzing, verify:
 
-- [ ] All four worksheets exist (Enhanced, Script Info, Raw, Timeline) for each participant
+- [ ] Participant worksheets exist for each participant (Enhanced, Raw, Timeline), and the shared Script Info worksheet is present
 - [ ] All key participants are included (organizer, affected attendees, delegates, room mailboxes)
 - [ ] LogTimestamp range covers the incident timeframe
 - [ ] Response rows exist (if investigating response issues — collected by default, use `-NoTrackingLogs` to skip)

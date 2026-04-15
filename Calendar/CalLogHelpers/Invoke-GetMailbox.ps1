@@ -253,7 +253,12 @@ function GetSMTPAddress {
     } elseif ($PassedCN -like "*<*@*>") {
         # This is a new format that we are seeing in the Calendar Logs.
         # Example: '"Jon Doe" <Jon.Doe@Contoso.com>'
-        $result = $($PassedCN -split ("<")[-1] -split (">")[0])[1].Trim()
+        $smtpMatch = [regex]::Match($PassedCN, '<([^>]+)>')
+        if ($smtpMatch.Success) {
+            $result = $smtpMatch.Groups[1].Value.Trim()
+        } else {
+            $result = $PassedCN
+        }
         Write-Verbose "GetSMTPAddress: Using <SMTPAddress> format of [$PassedCN] as [$result]"
     } elseif ($PassedCN -match '</O=') {
         #Matching "Users Name" </O=...>

@@ -55,11 +55,11 @@ function LogScriptInfo {
                             $script:RunNumber = [int]$Matches[1]
                         }
                     }
-                } else {
-                    if ($null -ne $pkg) { $pkg.Dispose() }
                 }
             } catch {
                 Write-Verbose "Unable to read existing run count from Excel: $_"
+            } finally {
+                if ($null -ne $pkg) { $pkg.Dispose() }
             }
         }
         $script:RunNumber++
@@ -172,13 +172,33 @@ function LogScriptInfo {
     # Update snapshot so next identity only captures new errors
     $script:PreRunErrorCount = $Error.Count
 
-    # Append to the existing Script Info tab
+    # Append to the existing Script Info tab (skip -Append on first write when the tab doesn't exist yet)
     $savedEAP = $ErrorActionPreference
     $ErrorActionPreference = 'SilentlyContinue'
-    $infoExcel = $RunInfo | Export-Excel -Path $FileName -WorksheetName "Script Info" -Append -PassThru 3>$null
+    $appendToSheet = $false
+    if (Test-Path $FileName) {
+        try {
+            $testPkg = Open-ExcelPackage -Path $FileName -ErrorAction SilentlyContinue
+            if ($null -ne $testPkg -and $null -ne $testPkg.Workbook.Worksheets["Script Info"]) {
+                $appendToSheet = $true
+            }
+            if ($null -ne $testPkg) { $testPkg.Dispose() }
+        } catch {
+            Write-Verbose "Unable to check for existing Script Info tab: $_"
+        }
+    }
+
+    if ($appendToSheet) {
+        $infoExcel = $RunInfo | Export-Excel -Path $FileName -WorksheetName "Script Info" -Append -PassThru 3>$null
+    } else {
+        $infoExcel = $RunInfo | Export-Excel -Path $FileName -WorksheetName "Script Info" -PassThru 3>$null
+    }
     $ErrorActionPreference = $savedEAP
-    $infoExcel.Workbook.Worksheets["Script Info"].TabColor = [System.Drawing.Color]::Gray
-    Export-Excel -ExcelPackage $infoExcel -WorksheetName "Script Info"
+
+    if ($null -ne $infoExcel) {
+        $infoExcel.Workbook.Worksheets["Script Info"].TabColor = [System.Drawing.Color]::Gray
+        Export-Excel -ExcelPackage $infoExcel -WorksheetName "Script Info"
+    }
 }
 
 function Export-TimelineExcel {
@@ -439,6 +459,12 @@ function SetLogRowTypeFilter {
     # colId is 0-based relative to the table, LogRowType is the 2nd column (B) = colId 1
     $tableStartCol = $tbl.Address.Start.Column
     $filterColId = $logRowCol - $tableStartCol
+
+    # Remove any existing filterColumn for this colId to avoid duplicates on reruns
+    $existingFilterCol = $autoFilter.SelectSingleNode("t:filterColumn[@colId='$filterColId']", $nsm)
+    if ($null -ne $existingFilterCol) {
+        $null = $autoFilter.RemoveChild($existingFilterCol)
+    }
 
     $filterCol = $tbl.TableXml.CreateElement("filterColumn", $ns)
     $filterCol.SetAttribute("colId", $filterColId.ToString())

@@ -51,7 +51,7 @@ function MapSharedFolder {
     if ($ExternalMasterID -eq "NotFound") {
         return "Not Shared"
     } else {
-        $SharedFolders[$ExternalMasterID]
+        $script:SharedFolders[$ExternalMasterID]
     }
 }
 
@@ -98,10 +98,10 @@ function CreateExternalMasterIDMap {
 
         if ($AllFolderNames.Count -eq 0) {
             $unknownCount++
-            $SharedFolders[$ExternalID] = "UnknownSharedCalendarCopy$unknownCount"
+            $script:SharedFolders[$ExternalID] = "UnknownSharedCalendarCopy$unknownCount"
             Write-Host -ForegroundColor red "Found Zero folder names to map to for ExternalID [$ExternalID]."
         } elseif ($AllFolderNames.Count -eq 1) {
-            $SharedFolders[$ExternalID] = $AllFolderNames[0]
+            $script:SharedFolders[$ExternalID] = $AllFolderNames[0]
             Write-Verbose "Found map: [$($AllFolderNames[0])] is for $ExternalID"
         } else {
             # we still have multiple possible Folder Names, need to chose one or combine
@@ -109,20 +109,20 @@ function CreateExternalMasterIDMap {
             Write-Host -ForegroundColor Red "Found $($AllFolderNames.count) possible folders: $($AllFolderNames -join ', ')"
 
             if ($AllFolderNames.Count -eq 2) {
-                $SharedFolders[$ExternalID] = $AllFolderNames[0] + " + " + $AllFolderNames[1]
+                $script:SharedFolders[$ExternalID] = $AllFolderNames[0] + " + " + $AllFolderNames[1]
             } else {
                 $unknownCount++
-                $SharedFolders[$ExternalID] = "UnknownSharedCalendarCopy$unknownCount"
+                $script:SharedFolders[$ExternalID] = "UnknownSharedCalendarCopy$unknownCount"
             }
         }
     }
 
     Write-Host -ForegroundColor Green "Created the following Shared Calendar Mapping:"
-    foreach ($Key in $SharedFolders.Keys) {
-        Write-Host -ForegroundColor Green "$Key : $($SharedFolders[$Key])"
+    foreach ($Key in $script:SharedFolders.Keys) {
+        Write-Host -ForegroundColor Green "$Key : $($script:SharedFolders[$Key])"
     }
     Write-Verbose "Created the following Mapping :"
-    Write-Verbose $SharedFolders
+    Write-Verbose $script:SharedFolders
 }
 
 <#
@@ -254,9 +254,9 @@ function ConvertDateTime {
         return $Parsed
     }
 
-    # Priority 5: Return original string rather than losing data
+    # Priority 5: Return MinValue so sorting is not broken by mixed types
     Write-Warning "Unable to parse date: [$DateTime]"
-    return $DateTime
+    return [DateTime]::MinValue
 }
 
 function GetAttendeeCount {
