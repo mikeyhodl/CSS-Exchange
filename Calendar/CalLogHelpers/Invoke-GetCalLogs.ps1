@@ -44,7 +44,6 @@ $script:CustomPropertyNameList =
 "SendMeetingMessagesDiagnostics",
 "Sensitivity",
 "SentRepresentingDisplayName",
-"SentRepresentingEmailAddress",
 "ShortClientInfoString",
 "TimeZone"
 
@@ -86,7 +85,7 @@ function GetCalendarDiagnosticObjects {
         ShouldDecodeEnums  = $true
     }
 
-    if ($TrackingLogs.IsPresent) {
+    if ($TrackingLogs -eq $true) {
         Write-Host -ForegroundColor Yellow "Including Tracking Logs in the output."
         $script:CustomPropertyNameList += "AttendeeListDetails", "AttendeeCollection"
         $params.Add("ShouldFetchAttendeeCollection", $true)
@@ -114,19 +113,21 @@ function GetCalendarDiagnosticObjects {
         $params.Add("CustomPropertyName", $script:CustomPropertyNameList)
     }
 
+    # Use 3>$null to suppress "Non-view properties may not be accurate for exception items"
+    # warnings from Get-CalendarDiagnosticObjects (remote session warnings bypass WarningAction/Preference).
     if ($Identity -and $MeetingID) {
         Write-Verbose "Getting CalLogs for [$Identity] with MeetingID [$MeetingID]."
         if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) {
             Write-Host -ForegroundColor Yellow ($params.GetEnumerator() | ForEach-Object { "`t$($_.Key) = $($_.Value)`n" })
         }
-        $CalLogs = Get-CalendarDiagnosticObjects @params -MeetingID $MeetingID
+        $CalLogs = Get-CalendarDiagnosticObjects @params -MeetingID $MeetingID 3>$null
     } elseif ($Identity -and $Subject ) {
         Write-Verbose "Getting CalLogs for [$Identity] with Subject [$Subject]."
-        $CalLogs = Get-CalendarDiagnosticObjects @params -Subject $Subject
+        $CalLogs = Get-CalendarDiagnosticObjects @params -Subject $Subject 3>$null
 
         # No Results, do a Deep search with ExactMatch.
         if ($CalLogs.count -lt 1) {
-            $CalLogs = Get-CalendarDiagnosticObjects @Params -Subject $Subject -ExactMatch $true
+            $CalLogs = Get-CalendarDiagnosticObjects @Params -Subject $Subject -ExactMatch $true 3>$null
         }
     }
 
@@ -147,22 +148,17 @@ function GetCalLogsWithSubject {
         [string] $Identity,
         [string] $Subject
     )
-    Write-Host "Getting CalLogs from [$Identity] with subject [$Subject]]"
+    Write-Host "Getting CalLogs from [$Identity] with subject [$Subject]"
 
     $InitialCDOs = GetCalendarDiagnosticObjects -Identity $Identity -Subject $Subject
-    $GlobalObjectIds = @()
 
     # Find all the unique Global Object IDs
-    foreach ($ObjectId in $InitialCDOs.CleanGlobalObjectId) {
-        if (![string]::IsNullOrEmpty($ObjectId) -and
-            $ObjectId -ne "NotFound" -and
-            $ObjectId -ne "InvalidSchemaPropertyName" -and
-            $ObjectId.Length -ge 90) {
-            $GlobalObjectIds += $ObjectId
-        }
-    }
-
-    $GlobalObjectIds = $GlobalObjectIds | Select-Object -Unique
+    $GlobalObjectIds = @($InitialCDOs.CleanGlobalObjectId | Where-Object {
+            -not [string]::IsNullOrEmpty($_) -and
+            $_ -ne "NotFound" -and
+            $_ -ne "InvalidSchemaPropertyName" -and
+            $_.Length -ge 90
+        } | Select-Object -Unique)
     Write-Host "Found $($GlobalObjectIds.count) unique GlobalObjectIds."
     Write-Host "Getting the set of CalLogs for each GlobalObjectID."
 

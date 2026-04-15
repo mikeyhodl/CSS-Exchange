@@ -6,85 +6,210 @@ function Export-CalLogExcel {
     Write-Host -ForegroundColor Cyan "Exporting Enhanced CalLogs to Excel Tab [$ShortId]..."
     $script:lastRow = 1000 # Default last row, will be updated later
     $script:firstRow = 3 # Row 1 is the Title, Row 2 is the Header
-    $script:lastColumn = "AL" # Column AL is the last column in the Excel sheet
+    $script:lastColumn = "AN" # Column AN is the last column in the Excel sheet
 
     $ExcelParamsArray = GetExcelParams -path $FileName -tabName $ShortId
 
-    $excel = $GCDOResults | Export-Excel @ExcelParamsArray -PassThru
+    # Suppress EPPlus warnings and errors that occur when writing to an existing file
+    # (AutoNameRange validation, named range conflicts, title character warnings)
+    $savedErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+
+    $excel = $GCDOResults | Export-Excel @ExcelParamsArray -PassThru 3>$null
+
+    $ErrorActionPreference = $savedErrorActionPreference
 
     FormatHeader ($excel)
+    SortByLogTimestamp ($excel)
     CheckRows ($excel)
+
+    # Set tab color to match the role (Organizer=Orange, Room=Green, Attendee=Blue)
+    $excel.Workbook.Worksheets[$ShortId].TabColor = $script:TabColor
+
     Export-Excel -ExcelPackage $excel -WorksheetName $ShortId -MoveToStart
+
+    # Log script info (will be positioned in the middle)
+    LogScriptInfo
 
     # Export Raw Logs for Developer Analysis
     Write-Host -ForegroundColor Cyan "Exporting Raw CalLogs to Excel Tab [$($ShortId + "_Raw")]..."
-    $script:GCDO | Export-Excel -Path  $FileName -WorksheetName $($ShortId + "_Raw") -AutoFilter -FreezeTopRow -BoldTopRow -MoveToEnd
-    LogScriptInfo
+    $ErrorActionPreference = 'SilentlyContinue'
+    $rawExcel = $script:GCDO | Export-Excel -Path $FileName -WorksheetName $($ShortId + "_Raw") -AutoFilter -FreezeTopRow -BoldTopRow -MoveToEnd -PassThru 3>$null
+    $ErrorActionPreference = $savedErrorActionPreference
+    $rawExcel.Workbook.Worksheets[$ShortId + "_Raw"].TabColor = $script:TabColor
+    Export-Excel -ExcelPackage $rawExcel -WorksheetName $($ShortId + "_Raw")
 }
 
 function LogScriptInfo {
-    # Only need to run once per script execution.
-    if ($null -eq $script:CollectedCmdLine) {
-        $RunInfo = @()
-        $RunInfo += [PSCustomObject]@{
-            Key   = "Script Name"
-            Value = $($script:command.MyCommand.Name)
+    # Increment run number only once per script invocation (not per identity)
+    if (-not $script:RunNumberSet) {
+        # Read the existing run count from the Excel file so numbering is continuous across sessions
+        if ($script:RunNumber -eq 0 -and (Test-Path $FileName)) {
+            try {
+                $pkg = Open-ExcelPackage -Path $FileName -ErrorAction SilentlyContinue
+                if ($null -ne $pkg -and $null -ne $pkg.Workbook.Worksheets["Script Info"]) {
+                    $existingInfo = Import-Excel -ExcelPackage $pkg -WorksheetName "Script Info" -ErrorAction SilentlyContinue
+                    if ($null -ne $existingInfo) {
+                        $lastRunKey = $existingInfo | Where-Object { $_.Key -like "--- Run #* ---" } | Select-Object -Last 1
+                        if ($null -ne $lastRunKey -and $lastRunKey.Key -match '#(\d+)') {
+                            $script:RunNumber = [int]$Matches[1]
+                        }
+                    }
+                } else {
+                    if ($null -ne $pkg) { $pkg.Dispose() }
+                }
+            } catch {
+                Write-Verbose "Unable to read existing run count from Excel: $_"
+            }
         }
-        $RunInfo += [PSCustomObject]@{
-            Key   ="RunTime"
-            Value = Get-Date
+        $script:RunNumber++
+        $script:RunNumberSet = $true
+        $script:RunHeaderWritten = $false
+    }
+
+    $RunInfo = [System.Collections.Generic.List[object]]::new()
+
+    # Write run header and shared info only once per run (on the first identity)
+    if (-not $script:RunHeaderWritten) {
+        $RunInfo.Add([PSCustomObject]@{
+                Key   = "--- Run #$($script:RunNumber) ---"
+                Value = "---"
+            })
+        $RunInfo.Add([PSCustomObject]@{
+                Key   = "RunTime"
+                Value = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+            })
+        $RunInfo.Add([PSCustomObject]@{
+                Key   = "Script Name"
+                Value = $($script:command.MyCommand.Name)
+            })
+        $RunInfo.Add([PSCustomObject]@{
+                Key   = "Command Line"
+                Value = $($script:command.Line)
+            })
+
+        # Combine version and age into one line
+        $versionText = if (-not [string]::IsNullOrEmpty($script:BuildVersion)) { $script:BuildVersion } else { "Unknown" }
+        if (-not [string]::IsNullOrEmpty($script:BuildVersion)) {
+            try {
+                $parts = $script:BuildVersion.Split('.')
+                $buildDate = [DateTime]::new(2000 + [int]$parts[0], [int]$parts[1], [int]$parts[2])
+                $age = (Get-Date) - $buildDate
+                $ageText = if ($age.Days -eq 0) { "today" }
+                elseif ($age.Days -eq 1) { "1 day old" }
+                elseif ($age.Days -lt 30) { "$($age.Days) days old" }
+                elseif ($age.Days -lt 365) { "$([math]::Floor($age.Days / 30)) month(s) old" }
+                else { "$([math]::Floor($age.Days / 365)) year(s), $([math]::Floor(($age.Days % 365) / 30)) month(s) old" }
+                $versionText = "$versionText ($ageText, built $($buildDate.ToString('yyyy-MM-dd')))"
+            } catch {
+                Write-Verbose "Unable to parse BuildVersion '$($script:BuildVersion)' for age calculation: $_"
+            }
         }
-        $RunInfo += [PSCustomObject]@{
-            Key   = "Command Line"
-            Value = $($script:command.Line)
-        }
-        $RunInfo += [PSCustomObject]@{
-            Key   = "Script Version"
-            Value =  $script:BuildVersion
-        }
-        $RunInfo += [PSCustomObject]@{
-            Key   = "User"
-            Value =  whoami.exe
-        }
-        $RunInfo += [PSCustomObject]@{
-            Key   = "PowerShell Version"
-            Value = $PSVersionTable.PSVersion
-        }
-        $RunInfo += [PSCustomObject]@{
-            Key   = "OS Version"
-            Value = $(Get-CimInstance -ClassName Win32_OperatingSystem).Version
-        }
-        $RunInfo += [PSCustomObject]@{
-            Key   = "More Info"
-            Value = "https://learn.microsoft.com/en-us/exchange/troubleshoot/calendars/analyze-calendar-diagnostic-logs"
+        $RunInfo.Add([PSCustomObject]@{
+                Key   = "Script Version"
+                Value = $versionText
+            })
+
+        $RunInfo.Add([PSCustomObject]@{
+                Key   = "Identities"
+                Value = ($ValidatedIdentities -join '; ')
+            })
+
+        # Only log environment info on the first run
+        if ($script:RunNumber -eq 1) {
+            $RunInfo.Add([PSCustomObject]@{
+                    Key   = "User"
+                    Value = whoami.exe
+                })
+            $RunInfo.Add([PSCustomObject]@{
+                    Key   = "PowerShell Version"
+                    Value = $PSVersionTable.PSVersion
+                })
+            $RunInfo.Add([PSCustomObject]@{
+                    Key   = "OS Version"
+                    Value = $(Get-CimInstance -ClassName Win32_OperatingSystem).Version
+                })
+            $RunInfo.Add([PSCustomObject]@{
+                    Key   = "More Info"
+                    Value = "https://learn.microsoft.com/en-us/exchange/troubleshoot/calendars/analyze-calendar-diagnostic-logs"
+                })
         }
 
-        $RunInfo | Export-Excel -Path $FileName -WorksheetName "Script Info" -MoveToEnd
-        $script:CollectedCmdLine = $true
+        $script:RunHeaderWritten = $true
     }
-    # If someone runs the script the script again logs will update, but ScriptInfo does not update. Need to add new table for each run.
+
+    # Per-identity line: show which identity was collected and log count
+    $logCount = if ($null -ne $script:GCDO) { $script:GCDO.Count } else { 0 }
+    $RunInfo.Add([PSCustomObject]@{
+            Key   = "  $($script:Identity)"
+            Value = "$logCount logs collected at $(Get-Date -Format 'HH:mm:ss')"
+        })
+
+    # Capture errors that occurred during this identity (new errors since last snapshot)
+    # Filter out EPPlus internal errors (IsValidAddress) and Import-Excel worksheet-not-found errors
+    $newErrors = @()
+    for ($i = 0; $i -lt ($Error.Count - $script:PreRunErrorCount); $i++) {
+        $err = $Error[$i]
+        $msg = if ($err -is [System.Management.Automation.ErrorRecord]) { $err.Exception.Message } else { $err.ToString() }
+        if ($msg -notlike '*IsValidAddress*' -and $msg -notlike '*Worksheet*Script Info*not found*') {
+            $newErrors += $err
+        }
+    }
+    if ($newErrors.Count -gt 0) {
+        for ($i = 0; $i -lt $newErrors.Count; $i++) {
+            $err = $newErrors[$i]
+            $errorMessage = if ($err -is [System.Management.Automation.ErrorRecord]) {
+                "$($err.Exception.Message) [$($err.CategoryInfo.Category): $($err.FullyQualifiedErrorId)]"
+            } else {
+                $err.ToString()
+            }
+            $RunInfo.Add([PSCustomObject]@{
+                    Key   = "    Error $($i + 1)"
+                    Value = $errorMessage
+                })
+        }
+    }
+    # Update snapshot so next identity only captures new errors
+    $script:PreRunErrorCount = $Error.Count
+
+    # Append to the existing Script Info tab
+    $savedEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    $infoExcel = $RunInfo | Export-Excel -Path $FileName -WorksheetName "Script Info" -Append -PassThru 3>$null
+    $ErrorActionPreference = $savedEAP
+    $infoExcel.Workbook.Worksheets["Script Info"].TabColor = [System.Drawing.Color]::Gray
+    Export-Excel -ExcelPackage $infoExcel -WorksheetName "Script Info"
 }
 
 function Export-TimelineExcel {
     Write-Host -ForegroundColor Cyan "Exporting Timeline to Excel..."
-    $script:TimeLineOutput | Export-Excel -Path $FileName -WorksheetName $($ShortId + "_TimeLine") -Title "Timeline for $Identity" -AutoSize -FreezeTopRow -BoldTopRow
+    $savedEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    $tlExcel = $script:TimeLineOutput | Export-Excel -Path $FileName -WorksheetName $($ShortId + "_TimeLine") -Title "Timeline for $Identity" -AutoSize -FreezeTopRow -BoldTopRow -PassThru 3>$null
+    $ErrorActionPreference = $savedEAP
+    $tlExcel.Workbook.Worksheets[$ShortId + "_TimeLine"].TabColor = $script:TabColor
+    Export-Excel -ExcelPackage $tlExcel -WorksheetName $($ShortId + "_TimeLine")
 }
 
 function GetExcelParams($path, $tabName) {
     if ($script:IsOrganizer) {
         $TableStyle = "Light10" # Orange for Organizer
         $TitleExtra = ", Organizer"
+        $script:TabColor = [System.Drawing.Color]::FromArgb(237, 125, 49) # Orange
     } elseif ($script:IsRoomMB) {
         Write-Host -ForegroundColor green "Room Mailbox Detected"
         $TableStyle = "Light11" # Green for Room Mailbox
         $TitleExtra = ", Resource"
+        $script:TabColor = [System.Drawing.Color]::FromArgb(112, 173, 71) # Green
     } else {
         $TableStyle = "Light12" # Light Blue for normal
         # Dark Blue for Delegates (once we can determine this)
+        $script:TabColor = [System.Drawing.Color]::FromArgb(91, 155, 213) # Blue
     }
 
     if ($script:CalLogsDisabled) {
         $TitleExtra += ", WARNING: CalLogs are Turned Off for $Identity! This will be a incomplete story"
+        $script:TabColor = [System.Drawing.Color]::FromArgb(255, 0, 0) # Red for Disabled CalLogs
     }
 
     $script:lastRow = $script:GCDO.Count + $firstRow - 1 # Last row is the number of items in the GCDO array + 2 for the header and title rows.
@@ -100,7 +225,6 @@ function GetExcelParams($path, $tabName) {
         TableName               = $tabName
         FreezeTopRowFirstColumn = $true
         AutoFilter              = $true
-        AutoNameRange           = $true
         Append                  = $true
         Title                   = "Enhanced Calendar Logs for $Identity" + $TitleExtra + " for MeetingID [$($script:GCDO[0].CleanGlobalObjectId)]."
         TitleSize               = 14
@@ -143,10 +267,12 @@ $ColumnMap = @{
     HasAttachment                  = "AF"
     IsCancelled                    = "AG"
     IsAllDayEvent                  = "AH"
-    IsSeriesCancelled              = "AI"
-    SendMeetingMessagesDiagnostics = "AJ"
-    AttendeeCollection             = "AK"
-    CalendarLogRequestId           = "AL"
+    Sensitivity                    = "AI"
+    IsSeriesCancelled              = "AJ"
+    SendMeetingMessagesDiagnostics = "AK"
+    AttendeeCollection             = "AL"
+    CalendarLogRequestId           = "AM"
+    CleanGlobalObjectId            = "AN"
 }
 
 function GetExcelColumnNumber {
@@ -215,9 +341,6 @@ $ConditionalFormatting = @(
     New-ConditionalText -Range (Get-ColumnRange -PropertyName 'FreeBusyStatus') -ConditionalType ContainsText -Text "Tentative" -ConditionalTextColor Orange -BackgroundColor $null
     New-ConditionalText -Range (Get-ColumnRange -PropertyName 'FreeBusyStatus') -ConditionalType ContainsText -Text "Busy" -ConditionalTextColor Green -BackgroundColor $null
 
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'SharedFolderName') -ConditionalType Equal -Text "Not Shared" -ConditionalTextColor Blue -BackgroundColor $null
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'SharedFolderName') -ConditionalType NotContainsText -Text "Not Shared" -ConditionalTextColor Black -BackgroundColor Tan
-
     New-ConditionalText -Range (Get-ColumnRange -PropertyName 'MeetingRequestType') -ConditionalType ContainsText -Text "Outdated" -ConditionalTextColor DarkRed -BackgroundColor LightPink
 
     New-ConditionalText -Range (Get-ColumnRange -PropertyName 'CalendarItemType') -ConditionalType ContainsText -Text "RecurringMaster" -ConditionalTextColor $null -BackgroundColor Plum
@@ -234,6 +357,9 @@ function CheckRows {
     )
     $sheet = $excel.Workbook.Worksheets[$ShortId]
 
+    # Pre-filter LogRowType to hide noisy rows (OtherAssistant, MeetingMessageChange, deleted exceptions)
+    SetLogRowTypeFilter -excel $excel
+
     # Highlight the Resp in LightGoldenRodYellow
     CheckColumnForText -sheet $sheet -columnNumber $(GetExcelColumnNumber($ColumnMap.ItemClass)) -textToFind "Resp" -cellColor "LightGoldenRodYellow" -fontColor "Black"
 
@@ -246,6 +372,244 @@ function CheckRows {
     # Highlight the Create from Transport in light blue
     CheckColumnsForValues -sheet $sheet -columnNumber1  $(GetExcelColumnNumber($ColumnMap.LogClientInfoString)) -value1 "Transport" -columnNumber2  $(GetExcelColumnNumber($ColumnMap.TriggerAction)) -value2 "Create" -cellColor "LightBlue" -fontColor "Black"
 
+    # Highlight SharedFolderName with unique colors per shared folder
+    HighlightSharedFolderNames -sheet $sheet
+
+    # Detect organizer anomalies (only on organizer's tab)
+    if ($script:IsOrganizer) {
+        CheckOrganizerErrors -sheet $sheet
+    }
+
+    $excel.Save()
+}
+
+<#
+.SYNOPSIS
+Pre-filters the LogRowType column in the Excel table to hide noisy row types.
+Hides OtherAssistant, MeetingMessageChange, and DeletedSeriesException rows by default.
+Users can clear the filter in Excel to see all rows.
+#>
+function SetLogRowTypeFilter {
+    param(
+        [object] $excel
+    )
+
+    $sheet = $excel.Workbook.Worksheets[$ShortId]
+    $logRowCol = GetExcelColumnNumber($ColumnMap.LogRowType)
+
+    # Values to hide by default
+    $hideValues = @("OtherAssistant", "MeetingMessageChange", "DeletedSeriesException")
+
+    # Collect all unique values in the LogRowType column
+    $lastDataRow = $sheet.Dimension.End.Row
+    $allValues = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    for ($row = $script:firstRow; $row -le $lastDataRow; $row++) {
+        $val = $sheet.Cells[$row, $logRowCol].Text
+        if (-not [string]::IsNullOrEmpty($val)) {
+            [void]$allValues.Add($val)
+        }
+    }
+
+    $showValues = @($allValues | Where-Object { $_ -notin $hideValues })
+    if ($showValues.Count -eq $allValues.Count) {
+        Write-Verbose "No LogRowType values to filter out."
+        return
+    }
+
+    Write-Verbose "Pre-filtering LogRowType: hiding $($hideValues -join ', ')"
+
+    # Get the table and its autoFilter XML node
+    $tbl = $sheet.Tables[0]
+    if ($null -eq $tbl) {
+        Write-Verbose "No table found, skipping LogRowType filter."
+        return
+    }
+
+    $ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    $nsm = [System.Xml.XmlNamespaceManager]::new($tbl.TableXml.NameTable)
+    $nsm.AddNamespace("t", $ns)
+    $autoFilter = $tbl.TableXml.SelectSingleNode("//t:autoFilter", $nsm)
+
+    if ($null -eq $autoFilter) {
+        Write-Verbose "No autoFilter found in table, skipping."
+        return
+    }
+
+    # Build filterColumn with visible values (Excel filters list what to SHOW)
+    # colId is 0-based relative to the table, LogRowType is the 2nd column (B) = colId 1
+    $tableStartCol = $tbl.Address.Start.Column
+    $filterColId = $logRowCol - $tableStartCol
+
+    $filterCol = $tbl.TableXml.CreateElement("filterColumn", $ns)
+    $filterCol.SetAttribute("colId", $filterColId.ToString())
+    $filters = $tbl.TableXml.CreateElement("filters", $ns)
+
+    foreach ($val in $showValues) {
+        $f = $tbl.TableXml.CreateElement("filter", $ns)
+        $f.SetAttribute("val", $val)
+        $null = $filters.AppendChild($f)
+    }
+    $null = $filterCol.AppendChild($filters)
+    $null = $autoFilter.AppendChild($filterCol)
+
+    # Hide the actual rows so they appear filtered on open
+    for ($row = $script:firstRow; $row -le $lastDataRow; $row++) {
+        $val = $sheet.Cells[$row, $logRowCol].Text
+        if ($val -in $hideValues) {
+            $sheet.Row($row).Hidden = $true
+        }
+    }
+}
+
+<#
+.SYNOPSIS
+Detects organizer anomalies on the Organizer's tab:
+1. ResponseType changes from "Organizer" to something else on IPM.Appointment/Exception rows (not shared).
+2. The From (Organizer SMTP) changes between qualifying rows, indicating multiple organizers.
+Highlights the row text in Red and the problematic cell in Yellow.
+#>
+function CheckOrganizerErrors {
+    param(
+        [object] $sheet
+    )
+
+    $itemClassCol = GetExcelColumnNumber($ColumnMap.ItemClass)
+    $sharedFolderCol = GetExcelColumnNumber($ColumnMap.SharedFolderName)
+    $responseTypeCol = GetExcelColumnNumber($ColumnMap.ResponseType)
+    $fromCol = GetExcelColumnNumber($ColumnMap.From)
+    $lastDataRow = $sheet.Dimension.End.Row
+    $lastDataCol = $sheet.Dimension.End.Column
+
+    $firstOrganizer = $null  # Track the first From value seen on a qualifying row
+
+    for ($row = $script:firstRow; $row -le $lastDataRow; $row++) {
+        $itemClass = $sheet.Cells[$row, $itemClassCol].Text
+        $sharedFolder = $sheet.Cells[$row, $sharedFolderCol].Text
+
+        # Only check IPM.Appointment and Exception rows that are not shared
+        if (($itemClass -ne "Ipm.Appointment" -and $itemClass -ne "Exception") -or
+            $sharedFolder -ne "Not Shared") {
+            continue
+        }
+
+        $responseType = $sheet.Cells[$row, $responseTypeCol].Text
+        $fromValue = $sheet.Cells[$row, $fromCol].Text
+
+        # Check 1: ResponseType should be "Organizer" on the organizer's tab
+        if ($responseType -ne "Organizer") {
+            # Red text for the whole row
+            $rowRange = $sheet.Cells[$row, 1, $row, $lastDataCol]
+            $rowRange.Style.Font.Color.SetColor([System.Drawing.Color]::Red)
+            # Yellow highlight on the ResponseType cell
+            $cell = $sheet.Cells[$row, $responseTypeCol]
+            $cell.Style.Fill.PatternType = 'Solid'
+            $cell.Style.Fill.BackgroundColor.SetColor([System.Drawing.Color]::Yellow)
+        }
+
+        # Check 2: From (Organizer SMTP) should not change between qualifying rows
+        if ([string]::IsNullOrEmpty($fromValue) -or $fromValue -eq "-") {
+            continue
+        }
+
+        if ($null -eq $firstOrganizer) {
+            $firstOrganizer = $fromValue
+        } elseif ($fromValue -ne $firstOrganizer) {
+            # Red text for the whole row
+            $rowRange = $sheet.Cells[$row, 1, $row, $lastDataCol]
+            $rowRange.Style.Font.Color.SetColor([System.Drawing.Color]::Red)
+            # Yellow highlight on the From cell
+            $cell = $sheet.Cells[$row, $fromCol]
+            $cell.Style.Fill.PatternType = 'Solid'
+            $cell.Style.Fill.BackgroundColor.SetColor([System.Drawing.Color]::Yellow)
+        }
+    }
+}
+
+<#
+.SYNOPSIS
+Highlights rows in the SharedFolderName column with a unique pale color per shared folder name.
+Cycles through 7 pale colors if there are more than 7 unique shared folder names.
+#>
+function HighlightSharedFolderNames {
+    param(
+        [object] $sheet
+    )
+
+    $sharedFolderCol = GetExcelColumnNumber($ColumnMap.SharedFolderName)
+    $lastDataRow = $sheet.Dimension.End.Row
+    $lastDataCol = $sheet.Dimension.End.Column
+
+    # Debug: verify column alignment
+    $headerValue = $sheet.Cells[2, $sharedFolderCol].Text
+    Write-Verbose "HighlightSharedFolderNames: Column $($ColumnMap.SharedFolderName) = col# $sharedFolderCol, header='$headerValue', rows=$($script:firstRow)..$lastDataRow"
+    if ($headerValue -ne "SharedFolderName") {
+        # Column map is misaligned — find the actual column by scanning the header row
+        for ($c = 1; $c -le $lastDataCol; $c++) {
+            if ($sheet.Cells[2, $c].Text -eq "SharedFolderName") {
+                Write-Host -ForegroundColor Yellow "HighlightSharedFolderNames: SharedFolderName found at column $c (expected $sharedFolderCol)"
+                $sharedFolderCol = $c
+                break
+            }
+        }
+    }
+
+    # Pale colors that are readable with black text
+    # cSpell:ignore FromArgb
+    [System.Drawing.Color[]] $PaleColors = @(
+        [System.Drawing.Color]::FromArgb(220, 245, 220)  # Pale Green
+        [System.Drawing.Color]::FromArgb(180, 215, 255)  # Pale Blue
+        [System.Drawing.Color]::FromArgb(255, 240, 220)  # Pale Peach
+        [System.Drawing.Color]::FromArgb(245, 230, 255)  # Pale Lavender
+        [System.Drawing.Color]::FromArgb(255, 255, 210)  # Pale Yellow
+        [System.Drawing.Color]::FromArgb(255, 225, 230)  # Pale Pink
+        [System.Drawing.Color]::FromArgb(220, 245, 245)  # Pale Cyan
+    )
+
+    # Collect unique SharedFolderName values and apply formatting in a single pass
+    $folderNames = @{}
+    $colorIndex = 0
+
+    for ($row = $script:firstRow; $row -le $lastDataRow; $row++) {
+        $cellValue = $sheet.Cells[$row, $sharedFolderCol].Text
+        if ([string]::IsNullOrEmpty($cellValue) -or $cellValue -eq "Not Shared") {
+            continue
+        }
+        if (-not $folderNames.ContainsKey($cellValue)) {
+            $folderNames[$cellValue] = $PaleColors[$colorIndex % $PaleColors.Count]
+            $colorIndex++
+        }
+
+        $color = $folderNames[$cellValue]
+        # Italicize the entire row
+        $rowRange = $sheet.Cells[$row, 1, $row, $lastDataCol]
+        $rowRange.Style.Font.Italic = $true
+        # Highlight only the SharedFolderName cell
+        $cell = $sheet.Cells[$row, $sharedFolderCol]
+        $cell.Style.Fill.PatternType = 'Solid'
+        $cell.Style.Fill.BackgroundColor.SetColor($color)
+    }
+
+    if ($folderNames.Count -eq 0) {
+        Write-Verbose "No shared folder names found to highlight."
+    } else {
+        Write-Verbose "Highlighted $($folderNames.Count) unique shared folder name(s)."
+    }
+}
+
+function SortByLogTimestamp {
+    param(
+        [object] $excel
+    )
+    $sheet = $excel.Workbook.Worksheets[$ShortId]
+    $dataStartRow = $script:firstRow # Row 3 (row 1 = title, row 2 = header)
+    $dataEndRow = $sheet.Dimension.End.Row
+    $dataEndCol = $sheet.Dimension.End.Column
+    $sortCol = GetExcelColumnNumber($ColumnMap.LogTimestamp)
+
+    # Sort the data range by LogTimestamp column ascending
+    # EPPlus Sort() takes a 0-based column offset within the range
+    $sortRange = $sheet.Cells[$dataStartRow, 1, $dataEndRow, $dataEndCol]
+    $sortRange.Sort($sortCol - 1)
     $excel.Save()
 }
 
@@ -262,12 +626,14 @@ function CheckColumnForText {
         [string] $fontColor = "DarkRed"
     )
 
+    $lastDataRow = $sheet.Dimension.End.Row
+    $lastDataCol = $sheet.Dimension.End.Column
     Write-Verbose "Checking column $columnNumber for text '$textToFind'..."
-    for ($row = 3; $row -le $sheet.Dimension.End.Row; $row++) {
+    for ($row = $script:firstRow; $row -le $lastDataRow; $row++) {
         $cellValue = $sheet.Cells[$row, $columnNumber].Text
 
         if ($cellValue -like "*$textToFind*") {
-            HighlightRow -sheet $sheet -rowNumber $row -cellColor $cellColor -fontColor $fontColor
+            HighlightRow -sheet $sheet -rowNumber $row -lastCol $lastDataCol -cellColor $cellColor -fontColor $fontColor
         }
     }
 }
@@ -284,13 +650,15 @@ function CheckColumnsForValues {
         [string] $fontColor = "DarkRed"
     )
 
+    $lastDataRow = $sheet.Dimension.End.Row
+    $lastDataCol = $sheet.Dimension.End.Column
     Write-Verbose "Checking for rows where column $columnNumber1 = '$value1' AND column $columnNumber2 = '$value2'..."
-    for ($row = 3; $row -le $sheet.Dimension.End.Row; $row++) {
+    for ($row = $script:firstRow; $row -le $lastDataRow; $row++) {
         $cellValue1 = $sheet.Cells[$row, $columnNumber1].Text
         $cellValue2 = $sheet.Cells[$row, $columnNumber2].Text
 
         if ($cellValue1 -like "*$value1*" -and $cellValue2 -like "*$value2*") {
-            HighlightRow -sheet $sheet -rowNumber $row -cellColor $cellColor -fontColor $fontColor
+            HighlightRow -sheet $sheet -rowNumber $row -lastCol $lastDataCol -cellColor $cellColor -fontColor $fontColor
         }
     }
 }
@@ -298,18 +666,17 @@ function CheckColumnsForValues {
 function HighlightRow {
     param(
         [object] $sheet,
-        [string] $rowNumber,
+        [int] $rowNumber,
+        [int] $lastCol,
         [string] $cellColor = "Thistle",
         [string] $fontColor = "DarkRed"
     )
-    # Highlight the entire row with the specified color
-    # 'A' to our last row, 'AM'.
-    $rowName = "A" + $row + ":" + $lastColumn + $row
 
-    Write-Verbose "Highlighting row $rowName with cell color [$cellColor] and font color [$fontColor]"
-    $sheet.Cells[$rowName].Style.Fill.PatternType = 'Solid'
-    $sheet.Cells[$rowName].Style.Fill.BackgroundColor.SetColor([System.Drawing.Color]::$cellColor)
-    $sheet.Cells[$rowName].Style.Font.Color.SetColor([System.Drawing.Color]::$fontColor)
+    $rowRange = $sheet.Cells[$rowNumber, 1, $rowNumber, $lastCol]
+    Write-Verbose "Highlighting row $rowNumber with cell color [$cellColor] and font color [$fontColor]"
+    $rowRange.Style.Fill.PatternType = 'Solid'
+    $rowRange.Style.Fill.BackgroundColor.SetColor([System.Drawing.Color]::$cellColor)
+    $rowRange.Style.Font.Color.SetColor([System.Drawing.Color]::$fontColor)
 }
 
 function FormatHeader {
@@ -322,7 +689,7 @@ function FormatHeader {
     # Define header metadata: property name, width, alignment, number format, comment
     $headerMeta = @(
         @{ Name = "LogTimestamp"; Width = 20; Align = "Center"; NumberFormat = "m/d/yyyy h:mm:ss"; Comment = "LogTimestamp: Time when the change was recorded in the CalLogs. This and all Times are in UTC." }
-        @{ Name = "LogRowType"; Width = 20; Align = "Left"; Comment = "LogRowType: Interesting logs are what to focus on, filter all the others out to start with." }
+        @{ Name = "LogRowType"; Width = 20; Align = "Left"; Comment = "LogRowType: Filtered by default! Interesting logs are what to focus on. OtherAssistant, MeetingMessageChange, and DeletedSeriesException are hidden. Clear the filter to see all rows." }
         @{ Name = "SubjectProperty"; Width = 20; Align = "Left"; Comment = "SubjectProperty: The Subject of the Meeting." }
         @{ Name = "Client"; Width = 20; Align = "Left"; Comment = "Client (ShortClientInfoString): The 'friendly' Client name of the client that made the change." }
         @{ Name = "LogClientInfoString"; Width = 5; Align = "Left"; Comment = "LogClientInfoString: Full Client Info String of client that made the change." }
@@ -337,7 +704,7 @@ function FormatHeader {
         @{ Name = "LogFolder"; Width = 16; Align = "Left"; Comment = "LogFolder (ParentDisplayName): The Log Folder that the CalLog was in." }
         @{ Name = "OriginalLogFolder"; Width = 16; Align = "Left"; Comment = "OriginalLogFolder (OriginalParentDisplayName): The Original Log Folder that the item was in / delivered to." }
         @{ Name = "SharedFolderName"; Width = 15; Align = "Left"; Comment = "SharedFolderName: Was this from a Modern Sharing, and if so what Folder." }
-        @{ Name = "ReceivedRepresenting"; Width = 10; Align = "Left"; Comment = "ReceivedRepresenting: Who the item was Received for, of then the Delegate." }
+        @{ Name = "ReceivedRepresenting"; Width = 10; Align = "Left"; Comment = "ReceivedRepresenting: Who the item was Received for, often the Delegate." }
         @{ Name = "MeetingRequestType"; Width = 10; Align = "Center"; Comment = "MeetingRequestType: The Meeting Request Type of the Meeting." }
         @{ Name = "StartTime"; Width = 23; Align = "Center"; NumberFormat = "m/d/yyyy h:mm:ss"; Comment = "StartTime: The Start Time of the Meeting. This and all Times are in UTC." }
         @{ Name = "EndTime"; Width = 23; Align = "Center"; NumberFormat = "m/d/yyyy h:mm:ss"; Comment = "EndTime: The End Time of the Meeting. This and all Times are in UTC." }
@@ -355,10 +722,12 @@ function FormatHeader {
         @{ Name = "HasAttachment"; Width = 10; Align = "Center"; Comment = "HasAttachment: Does this Meeting have an Attachment?" }
         @{ Name = "IsCancelled"; Width = 10; Align = "Center"; Comment = "IsCancelled: Is this Meeting Cancelled?" }
         @{ Name = "IsAllDayEvent"; Width = 10; Align = "Center"; Comment = "IsAllDayEvent: Is this an All Day Event?" }
+        @{ Name = "Sensitivity"; Width = 12; Align = "Center"; Comment = "Sensitivity: The Sensitivity of the Meeting (Normal, Personal, Private, Confidential)." }
         @{ Name = "IsSeriesCancelled"; Width = 10; Align = "Center"; Comment = "IsSeriesCancelled: Is this a Series Cancelled Meeting?" }
         @{ Name = "SendMeetingMessagesDiagnostics"; Width = 30; Align = "Left"; Comment = "SendMeetingMessagesDiagnostics: Compound Property to describe why meeting was or was not sent to everyone." }
         @{ Name = "AttendeeCollection"; Width = 50; Align = "Left"; Comment = "AttendeeCollection: The Attendee Collection of the Meeting, use -TrackingLogs to get values." }
         @{ Name = "CalendarLogRequestId"; Width = 40; Align = "Center"; Comment = "CalendarLogRequestId: The Calendar Log Request ID of the Meeting." }
+        @{ Name = "CleanGlobalObjectId"; Width = 40; Align = "Left"; Comment = "CleanGlobalObjectId: The MeetingID / Clean Global Object ID of the Meeting." }
     )
 
     foreach ($meta in $headerMeta) {
@@ -381,7 +750,7 @@ function FormatHeader {
 
     # Title Row
     $sheet.Row(1) | Set-ExcelRange -HorizontalAlignment Left
-    Set-CellComment -Text "For more information see: Https:\\aka.ms\AnalyzeCalLogs"  -Row 1 -ColumnNumber 1  -Worksheet $sheet
+    Set-CellComment -Text "For more information see: https://aka.ms/AnalyzeCalLogs"  -Row 1 -ColumnNumber 1  -Worksheet $sheet
 
     # Set the Header row to be bold and left aligned
     $sheet.Row($HeaderRow) | Set-ExcelRange -Bold -HorizontalAlignment Left
