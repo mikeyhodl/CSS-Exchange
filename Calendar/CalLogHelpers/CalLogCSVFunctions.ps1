@@ -109,6 +109,7 @@ function CreateExternalMasterIDMap {
         $AllFolderNames = @($script:GCDO | Where-Object { $_.ExternalSharingMasterId -eq $ExternalID } | Select-Object -ExpandProperty OriginalParentDisplayName | Select-Object -Unique)
 
         # Default calendar folder names across the top localized versions of Exchange
+        # cSpell:ignore Kalender Calendario Calendrier Calendário Календарь
         $DefaultCalendarNames = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         [void]$DefaultCalendarNames.Add('Calendar')       # English
         [void]$DefaultCalendarNames.Add('Kalender')        # German, Dutch, Swedish, Norwegian, Danish
