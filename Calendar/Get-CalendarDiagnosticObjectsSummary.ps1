@@ -149,35 +149,42 @@ if (!$ExportToCSV.IsPresent) {
     . $PSScriptRoot\CalLogHelpers\ExportToExcelFunctions.ps1
 }
 
-# Default to Collecting Tracking Logs
-if (!$NoTrackingLogs.IsPresent) {
-    $TrackingLogs = $true
-    Write-Host -ForegroundColor Yellow "Collecting Tracking Logs."
-    Write-Host -ForegroundColor Yellow "`tTo skip collecting Tracking Logs, use the -NoTrackingLogs switch."
-} else {
-    Write-Host -ForegroundColor Green "Not Collecting Tracking Logs."
-}
-
-# Default to Collecting Exceptions
-if ((!$NoExceptions.IsPresent) -and ([string]::IsNullOrEmpty($ExceptionDate))) {
-    $Exceptions=$true
-    Write-Host -ForegroundColor Yellow "Collecting Exceptions."
-    Write-Host -ForegroundColor Yellow "`tTo skip collecting Exceptions, use the -NoExceptions switch."
-} else {
-    Write-Host -ForegroundColor Green "---------------------------------------"
-    if ($NoExceptions.IsPresent) {
-        Write-Host -ForegroundColor Green "Not Checking for Exceptions"
+# Default to Collecting Tracking Logs (MeetingID only)
+if (-not ([string]::IsNullOrEmpty($MeetingID))) {
+    if (!$NoTrackingLogs.IsPresent) {
+        $TrackingLogs = $true
+        Write-Host -ForegroundColor Yellow "Collecting Tracking Logs."
+        Write-Host -ForegroundColor Yellow "`tTo skip collecting Tracking Logs, use the -NoTrackingLogs switch."
     } else {
-        Write-Host -ForegroundColor Green "Checking for Exceptions on $ExceptionDate"
+        Write-Host -ForegroundColor Green "Not Collecting Tracking Logs."
     }
-    Write-Host -ForegroundColor Green "---------------------------------------"
+
+    # Default to Collecting Exceptions (MeetingID only)
+    if ((!$NoExceptions.IsPresent) -and ([string]::IsNullOrEmpty($ExceptionDate))) {
+        $Exceptions=$true
+        Write-Host -ForegroundColor Yellow "Collecting Exceptions."
+        Write-Host -ForegroundColor Yellow "`tTo skip collecting Exceptions, use the -NoExceptions switch."
+    } else {
+        Write-Host -ForegroundColor Green "---------------------------------------"
+        if ($NoExceptions.IsPresent) {
+            Write-Host -ForegroundColor Green "Not Checking for Exceptions"
+        } else {
+            Write-Host -ForegroundColor Green "Checking for Exceptions on $ExceptionDate"
+        }
+        Write-Host -ForegroundColor Green "---------------------------------------"
+    }
+} else {
+    # Subject-based search
+    $script:SubjectSearch = $true
+    Write-Host -ForegroundColor Yellow "Using Subject search. Tracking Logs and Exception collection are only available with -MeetingID."
+    Write-Host -ForegroundColor Yellow "`tTip: Use the MeetingID from this output to recollect with full details."
 }
 
 # ===================================================================================================
 # Main
 # ===================================================================================================
 
-$ValidatedIdentities = CheckIdentities -Identity $Identity
+[array]$ValidatedIdentities = CheckIdentities -Identity $Identity
 
 if ($ExportToExcel.IsPresent) {
     CheckExcelModuleInstalled

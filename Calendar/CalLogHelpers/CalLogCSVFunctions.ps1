@@ -25,7 +25,6 @@ $script:CalendarItemTypes = @{
     'IPM.OLE.CLASS.{00061055-0000-0000-C000-000000000046}' = "Exception"
     'IPM.Schedule.Meeting.Notification.Forward'            = "Forward.Notification"
     'IPM.Appointment'                                      = "Ipm.Appointment"
-    'IPM.Appointment.MP'                                   = "Ipm.Appointment"
     'IPM.Schedule.Meeting.Request'                         = "Meeting.Request"
     'IPM.CalendarSharing.EventUpdate'                      = "SharingCFM"
     'IPM.CalendarSharing.EventDelete'                      = "SharingDelete"
@@ -34,6 +33,28 @@ $script:CalendarItemTypes = @{
     'IPM.Schedule.Meeting.Resp.Tent'                       = "Resp.Tent"
     'IPM.Schedule.Meeting.Resp.Pos'                        = "Resp.Pos"
     '(Occurrence Deleted)'                                 = "Exception.Deleted"
+}
+
+<#
+.SYNOPSIS
+Resolves the ItemClass to a friendly type name using the CalendarItemTypes table.
+If no exact match is found, progressively strips the last dot-segment and retries.
+e.g. IPM.Schedule.Meeting.Resp.Tent.Follow → IPM.Schedule.Meeting.Resp.Tent → "Resp.Tent"
+#>
+function GetItemType {
+    param([string]$ItemClass)
+    $lookup = $ItemClass
+    while (-not [string]::IsNullOrEmpty($lookup)) {
+        $type = $script:CalendarItemTypes[$lookup]
+        if (-not [string]::IsNullOrEmpty($type)) {
+            return $type
+        }
+        # Strip the last segment and try the parent
+        $lastDot = $lookup.LastIndexOf('.')
+        if ($lastDot -le 0) { break }
+        $lookup = $lookup.Substring(0, $lastDot)
+    }
+    return $null
 }
 
 # ===================================================================================================
@@ -86,6 +107,9 @@ function CreateExternalMasterIDMap {
         }
 
         $AllFolderNames = @($script:GCDO | Where-Object { $_.ExternalSharingMasterId -eq $ExternalID } | Select-Object -ExpandProperty OriginalParentDisplayName | Select-Object -Unique)
+
+        # Remove empty/null and 'Calendar' (the default folder name) entries
+        $AllFolderNames = @($AllFolderNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 
         if ($AllFolderNames.count -gt 1) {
             # We have 2+ FolderNames, remove only exact match to 'Calendar' (the default folder name, not folder names containing 'Calendar')
@@ -161,7 +185,7 @@ function BuildCSV {
     $Index = 0
     $GCDOResults = foreach ($CalLog in $script:GCDO) {
         $Index++
-        $ItemType = $CalendarItemTypes.($CalLog.ItemClass)
+        $ItemType = GetItemType $CalLog.ItemClass
 
         # CleanNotFounds
         $PropsToClean = "FreeBusyStatus", "ClientIntent", "AppointmentSequenceNumber", "AppointmentLastSequenceNumber", "RecurrencePattern", "AppointmentAuxiliaryFlags", "EventEmailReminderTimer", "IsSeriesCancelled", "AppointmentCounterProposal", "MeetingRequestType", "SendMeetingMessagesDiagnostics", "AttendeeCollection"

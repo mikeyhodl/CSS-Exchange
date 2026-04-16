@@ -122,7 +122,7 @@ function BuildTimeline {
 
         # Setup Previous log (if current logs is an IPM.Appointment)
         if ($null -ne $CalLog.ItemClass -and
-            ($CalendarItemTypes.($CalLog.ItemClass) -eq "Ipm.Appointment" -or $CalendarItemTypes.($CalLog.ItemClass) -eq "Exception")) {
+            ((GetItemType $CalLog.ItemClass) -eq "Ipm.Appointment" -or (GetItemType $CalLog.ItemClass) -eq "Exception")) {
             $script:PreviousCalLog = $CalLog
         }
     }

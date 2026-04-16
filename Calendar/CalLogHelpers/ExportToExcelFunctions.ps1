@@ -115,6 +115,18 @@ function LogScriptInfo {
                 Value = ($ValidatedIdentities -join '; ')
             })
 
+        if ($script:SubjectSearch) {
+            $RunInfo.Add([PSCustomObject]@{
+                    Key   = "Collection Method"
+                    Value = "Subject search (no Exception or Tracking Log data). Use -MeetingID for full collection."
+                })
+        } else {
+            $RunInfo.Add([PSCustomObject]@{
+                    Key   = "Collection Method"
+                    Value = "MeetingID"
+                })
+        }
+
         # Only log environment info on the first run
         if ($script:RunNumber -eq 1) {
             $RunInfo.Add([PSCustomObject]@{
@@ -172,33 +184,46 @@ function LogScriptInfo {
     # Update snapshot so next identity only captures new errors
     $script:PreRunErrorCount = $Error.Count
 
-    # Append to the existing Script Info tab (skip -Append on first write when the tab doesn't exist yet)
+    # Write Script Info into the existing workbook (Enhanced tab was already saved)
     $savedEAP = $ErrorActionPreference
     $ErrorActionPreference = 'SilentlyContinue'
-    $appendToSheet = $false
-    if (Test-Path $FileName) {
-        try {
-            $testPkg = Open-ExcelPackage -Path $FileName -ErrorAction SilentlyContinue
-            if ($null -ne $testPkg -and $null -ne $testPkg.Workbook.Worksheets["Script Info"]) {
-                $appendToSheet = $true
-            }
-            if ($null -ne $testPkg) { $testPkg.Dispose() }
-        } catch {
-            Write-Verbose "Unable to check for existing Script Info tab: $_"
+
+    # Open existing package and add/append the Script Info sheet
+    try {
+        $pkg = Open-ExcelPackage -Path $FileName -ErrorAction Stop
+        $sheetExists = $null -ne $pkg.Workbook.Worksheets["Script Info"]
+
+        if ($sheetExists) {
+            # Append rows after existing data
+            $ws = $pkg.Workbook.Worksheets["Script Info"]
+            $startRow = $ws.Dimension.End.Row + 1
+        } else {
+            # Create a new sheet
+            $ws = $pkg.Workbook.Worksheets.Add("Script Info")
+            $startRow = 1
+            # Add header row
+            $ws.Cells[$startRow, 1].Value = "Key"
+            $ws.Cells[$startRow, 2].Value = "Value"
+            $startRow = 2
         }
+
+        foreach ($item in $RunInfo) {
+            $ws.Cells[$startRow, 1].Value = $item.Key
+            $ws.Cells[$startRow, 2].Value = [string]$item.Value
+            $startRow++
+        }
+
+        $ws.Column(1).Width = 25
+        $ws.Column(2).Width = 80
+        $ws.TabColor = [System.Drawing.Color]::Gray
+        $pkg.Save()
+        $pkg.Dispose()
+    } catch {
+        Write-Warning "Unable to write Script Info tab: $_"
+        if ($null -ne $pkg) { $pkg.Dispose() }
     }
 
-    if ($appendToSheet) {
-        $infoExcel = $RunInfo | Export-Excel -Path $FileName -WorksheetName "Script Info" -Append -PassThru 3>$null
-    } else {
-        $infoExcel = $RunInfo | Export-Excel -Path $FileName -WorksheetName "Script Info" -PassThru 3>$null
-    }
     $ErrorActionPreference = $savedEAP
-
-    if ($null -ne $infoExcel) {
-        $infoExcel.Workbook.Worksheets["Script Info"].TabColor = [System.Drawing.Color]::Gray
-        Export-Excel -ExcelPackage $infoExcel -WorksheetName "Script Info"
-    }
 }
 
 function Export-TimelineExcel {
@@ -230,6 +255,10 @@ function GetExcelParams($path, $tabName) {
     if ($script:CalLogsDisabled) {
         $TitleExtra += ", WARNING: CalLogs are Turned Off for $Identity! This will be a incomplete story"
         $script:TabColor = [System.Drawing.Color]::FromArgb(255, 0, 0) # Red for Disabled CalLogs
+    }
+
+    if ($script:SubjectSearch) {
+        $TitleExtra += ", Collected with Subject search (no Exception info)"
     }
 
     $script:lastRow = $script:GCDO.Count + $firstRow - 1 # Last row is the number of items in the GCDO array + 2 for the header and title rows.
