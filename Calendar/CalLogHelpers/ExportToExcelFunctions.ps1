@@ -13,11 +13,12 @@ function Export-CalLogExcel {
     # Suppress EPPlus warnings and errors that occur when writing to an existing file
     # (AutoNameRange validation, named range conflicts, title character warnings)
     $savedErrorActionPreference = $ErrorActionPreference
-    $ErrorActionPreference = 'SilentlyContinue'
-
-    $excel = $GCDOResults | Export-Excel @ExcelParamsArray -PassThru 3>$null
-
-    $ErrorActionPreference = $savedErrorActionPreference
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        $excel = $GCDOResults | Export-Excel @ExcelParamsArray -PassThru 3>$null
+    } finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
 
     FormatHeader ($excel)
     SortByLogTimestamp ($excel)
@@ -33,9 +34,12 @@ function Export-CalLogExcel {
 
     # Export Raw Logs for Developer Analysis
     Write-Host -ForegroundColor Cyan "Exporting Raw CalLogs to Excel Tab [$($ShortId + "_Raw")]..."
-    $ErrorActionPreference = 'SilentlyContinue'
-    $rawExcel = $script:GCDO | Export-Excel -Path $FileName -WorksheetName $($ShortId + "_Raw") -AutoFilter -FreezeTopRow -BoldTopRow -MoveToEnd -PassThru 3>$null
-    $ErrorActionPreference = $savedErrorActionPreference
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        $rawExcel = $script:GCDO | Export-Excel -Path $FileName -WorksheetName $($ShortId + "_Raw") -AutoFilter -FreezeTopRow -BoldTopRow -MoveToEnd -PassThru 3>$null
+    } finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
     $rawExcel.Workbook.Worksheets[$ShortId + "_Raw"].TabColor = $script:TabColor
     Export-Excel -ExcelPackage $rawExcel -WorksheetName $($ShortId + "_Raw")
 }
@@ -186,52 +190,57 @@ function LogScriptInfo {
 
     # Write Script Info into the existing workbook (Enhanced tab was already saved)
     $savedEAP = $ErrorActionPreference
-    $ErrorActionPreference = 'SilentlyContinue'
-
-    # Open existing package and add/append the Script Info sheet
     try {
-        $pkg = Open-ExcelPackage -Path $FileName -ErrorAction Stop
-        $sheetExists = $null -ne $pkg.Workbook.Worksheets["Script Info"]
+        $ErrorActionPreference = 'SilentlyContinue'
 
-        if ($sheetExists) {
-            # Append rows after existing data
-            $ws = $pkg.Workbook.Worksheets["Script Info"]
-            $startRow = $ws.Dimension.End.Row + 1
-        } else {
-            # Create a new sheet
-            $ws = $pkg.Workbook.Worksheets.Add("Script Info")
-            $startRow = 1
-            # Add header row
-            $ws.Cells[$startRow, 1].Value = "Key"
-            $ws.Cells[$startRow, 2].Value = "Value"
-            $startRow = 2
+        # Open existing package and add/append the Script Info sheet
+        try {
+            $pkg = Open-ExcelPackage -Path $FileName -ErrorAction Stop
+            $sheetExists = $null -ne $pkg.Workbook.Worksheets["Script Info"]
+
+            if ($sheetExists) {
+                # Append rows after existing data
+                $ws = $pkg.Workbook.Worksheets["Script Info"]
+                $startRow = $ws.Dimension.End.Row + 1
+            } else {
+                # Create a new sheet
+                $ws = $pkg.Workbook.Worksheets.Add("Script Info")
+                $startRow = 1
+                # Add header row
+                $ws.Cells[$startRow, 1].Value = "Key"
+                $ws.Cells[$startRow, 2].Value = "Value"
+                $startRow = 2
+            }
+
+            foreach ($item in $RunInfo) {
+                $ws.Cells[$startRow, 1].Value = $item.Key
+                $ws.Cells[$startRow, 2].Value = [string]$item.Value
+                $startRow++
+            }
+
+            $ws.Column(1).Width = 25
+            $ws.Column(2).Width = 80
+            $ws.TabColor = [System.Drawing.Color]::Gray
+            $pkg.Save()
+            $pkg.Dispose()
+        } catch {
+            Write-Warning "Unable to write Script Info tab: $_"
+            if ($null -ne $pkg) { $pkg.Dispose() }
         }
-
-        foreach ($item in $RunInfo) {
-            $ws.Cells[$startRow, 1].Value = $item.Key
-            $ws.Cells[$startRow, 2].Value = [string]$item.Value
-            $startRow++
-        }
-
-        $ws.Column(1).Width = 25
-        $ws.Column(2).Width = 80
-        $ws.TabColor = [System.Drawing.Color]::Gray
-        $pkg.Save()
-        $pkg.Dispose()
-    } catch {
-        Write-Warning "Unable to write Script Info tab: $_"
-        if ($null -ne $pkg) { $pkg.Dispose() }
+    } finally {
+        $ErrorActionPreference = $savedEAP
     }
-
-    $ErrorActionPreference = $savedEAP
 }
 
 function Export-TimelineExcel {
     Write-Host -ForegroundColor Cyan "Exporting Timeline to Excel..."
     $savedEAP = $ErrorActionPreference
-    $ErrorActionPreference = 'SilentlyContinue'
-    $tlExcel = $script:TimeLineOutput | Export-Excel -Path $FileName -WorksheetName $($ShortId + "_TimeLine") -Title "Timeline for $Identity" -AutoSize -FreezeTopRow -BoldTopRow -PassThru 3>$null
-    $ErrorActionPreference = $savedEAP
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        $tlExcel = $script:TimeLineOutput | Export-Excel -Path $FileName -WorksheetName $($ShortId + "_TimeLine") -Title "Timeline for $Identity" -AutoSize -FreezeTopRow -BoldTopRow -PassThru 3>$null
+    } finally {
+        $ErrorActionPreference = $savedEAP
+    }
     $tlExcel.Workbook.Worksheets[$ShortId + "_TimeLine"].TabColor = $script:TabColor
     Export-Excel -ExcelPackage $tlExcel -WorksheetName $($ShortId + "_TimeLine")
 }

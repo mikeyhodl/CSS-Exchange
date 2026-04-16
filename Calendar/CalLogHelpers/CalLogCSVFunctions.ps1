@@ -108,16 +108,25 @@ function CreateExternalMasterIDMap {
 
         $AllFolderNames = @($script:GCDO | Where-Object { $_.ExternalSharingMasterId -eq $ExternalID } | Select-Object -ExpandProperty OriginalParentDisplayName | Select-Object -Unique)
 
-        # Remove empty/null and 'Calendar' (the default folder name) entries
+        # Default calendar folder names across the top localized versions of Exchange
+        $DefaultCalendarNames = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        [void]$DefaultCalendarNames.Add('Calendar')       # English
+        [void]$DefaultCalendarNames.Add('Kalender')        # German, Dutch, Swedish, Norwegian, Danish
+        [void]$DefaultCalendarNames.Add('Calendario')      # Spanish, Italian
+        [void]$DefaultCalendarNames.Add('Calendrier')      # French
+        [void]$DefaultCalendarNames.Add('Calendário')     # Portuguese
+        [void]$DefaultCalendarNames.Add('Календарь')      # Russian
+
+        # Remove empty/null entries
         $AllFolderNames = @($AllFolderNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 
         if ($AllFolderNames.count -gt 1) {
-            # We have 2+ FolderNames, remove only exact match to 'Calendar' (the default folder name, not folder names containing 'Calendar')
-            $Filtered = $AllFolderNames | Where-Object { $_ -ne 'Calendar' }
+            # We have 2+ FolderNames, remove default calendar folder names (localized) by exact match
+            $Filtered = $AllFolderNames | Where-Object { -not $DefaultCalendarNames.Contains($_) }
             if ($Filtered.Count -gt 0) {
                 $AllFolderNames = @($Filtered)
             }
-            # else keep the original list — all entries were 'Calendar'
+            # else keep the original list — all entries were default calendar names
         }
 
         if ($AllFolderNames.Count -eq 0) {
