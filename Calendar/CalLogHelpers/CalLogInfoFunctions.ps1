@@ -39,13 +39,15 @@ function SetIsRoom {
     }
 
     # Simple logic is if RBA is running on the MB, it is a Room MB, otherwise it is not.
-    foreach ($CalLog in $CalLogs) {
-        Write-Verbose "Checking if this is a Room Mailbox. [$($CalLog.ItemClass)] [$($CalLog.ExternalSharingMasterId)] [$($CalLog.LogClientInfoString)]"
-        if ($CalLog.ItemClass -eq "IPM.Appointment" -and
-            $CalLog.ExternalSharingMasterId -eq "NotFound" -and
-            $CalLog.LogClientInfoString -like "*ResourceBookingAssistant*" ) {
-            return $true
-        }
+    $rbaLog = $CalLogs | Where-Object {
+        $_.ItemClass -eq "IPM.Appointment" -and
+        $_.ExternalSharingMasterId -eq "NotFound" -and
+        $_.LogClientInfoString -like "*ResourceBookingAssistant*"
+    } | Select-Object -First 1
+
+    if ($null -ne $rbaLog) {
+        Write-Host -ForegroundColor Green "Found Room Mailbox indicator: [$($rbaLog.LogClientInfoString)]"
+        return $true
     }
     return $false
 }
@@ -62,7 +64,8 @@ function SetIsRecurring {
     [bool] $IsRecurring = $false
     # See if this is a recurring meeting
     foreach ($CalLog in $CalLogs) {
-        if ($CalendarItemTypes.($CalLog.ItemClass) -eq "Ipm.Appointment" -and
+        if ($null -ne $CalLog.ItemClass -and
+            (GetItemType $CalLog.ItemClass) -eq "Ipm.Appointment" -and
             # Commenting this out will get all the updates for shared calendars, which is important with Delegates.
             #      $CalLog.ExternalSharingMasterId -eq "NotFound" -and
             $CalLog.CalendarItemType.ToString() -eq "RecurringMaster") {
@@ -94,8 +97,8 @@ function CheckForBifurcation {
             return $IsBifurcated
         }
     }
-    Write-Host -ForegroundColor Red "Did not find any Ipm.Appointments in the CalLogs. If this is the Organizer of the meeting, this could the the Outlook Bifurcation issue."
-    Write-Host -ForegroundColor Yellow "`t This could be the Outlook Bifurcation issue, where Outlook saves to the Organizers Mailbox on one thread and send to the attendee via transport on another thread.  If the save to Organizers mailbox failed, we get into the Bifurcated State, where the Organizer does not have the meeting but the Attendees do."
+    Write-Host -ForegroundColor Red "Did not find any Ipm.Appointments in the CalLogs. If this is the Organizer of the meeting, this could be the Outlook Bifurcation issue."
+    Write-Host -ForegroundColor Yellow "`t The Outlook Bifurcation issue is where Outlook saves to the Organizer's Mailbox on one thread and sends to the attendees via transport on another thread. If the save to the Organizer's mailbox failed, we get into the Bifurcated State, where the Organizer does not have the meeting but the Attendees do."
     Write-Host -ForegroundColor Yellow "`t See https://support.microsoft.com/en-us/office/meeting-request-is-missing-from-organizers-calendar-c13c47cd-18f9-4ef0-b9d0-d9e174912c4a"
     return $IsBifurcated
 }

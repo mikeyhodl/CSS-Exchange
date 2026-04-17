@@ -4,6 +4,20 @@
 # ===================================================================================================
 # Constants to support the script
 # ===================================================================================================
+# Non-US date formats for TryParseExact fallback (constant, created once)
+[string[]]$script:DateFormats = @(
+    "d/M/yyyy h:mm:ss tt",
+    "d/M/yyyy H:mm:ss",
+    "d/M/yyyy H:mm",
+    "d/M/yyyy h:mm tt",
+    "dd/MM/yyyy h:mm:ss tt",
+    "dd/MM/yyyy H:mm:ss",
+    "dd/MM/yyyy HH:mm:ss",
+    "dd/MM/yyyy H:mm",
+    "dd/MM/yyyy h:mm tt",
+    "d/M/yyyy",
+    "dd/MM/yyyy"
+)
 
 $script:CalendarItemTypes = @{
     'IPM.Schedule.Meeting.Request.AttendeeListReplication' = "AttendeeList"
@@ -11,7 +25,6 @@ $script:CalendarItemTypes = @{
     'IPM.OLE.CLASS.{00061055-0000-0000-C000-000000000046}' = "Exception"
     'IPM.Schedule.Meeting.Notification.Forward'            = "Forward.Notification"
     'IPM.Appointment'                                      = "Ipm.Appointment"
-    'IPM.Appointment.MP'                                   = "Ipm.Appointment"
     'IPM.Schedule.Meeting.Request'                         = "Meeting.Request"
     'IPM.CalendarSharing.EventUpdate'                      = "SharingCFM"
     'IPM.CalendarSharing.EventDelete'                      = "SharingDelete"
@@ -20,6 +33,28 @@ $script:CalendarItemTypes = @{
     'IPM.Schedule.Meeting.Resp.Tent'                       = "Resp.Tent"
     'IPM.Schedule.Meeting.Resp.Pos'                        = "Resp.Pos"
     '(Occurrence Deleted)'                                 = "Exception.Deleted"
+}
+
+<#
+.SYNOPSIS
+Resolves the ItemClass to a friendly type name using the CalendarItemTypes table.
+If no exact match is found, progressively strips the last dot-segment and retries.
+e.g. IPM.Schedule.Meeting.Resp.Tent.Follow → IPM.Schedule.Meeting.Resp.Tent → "Resp.Tent"
+#>
+function GetItemType {
+    param([string]$ItemClass)
+    $lookup = $ItemClass
+    while (-not [string]::IsNullOrEmpty($lookup)) {
+        $type = $script:CalendarItemTypes[$lookup]
+        if (-not [string]::IsNullOrEmpty($type)) {
+            return $type
+        }
+        # Strip the last segment and try the parent
+        $lastDot = $lookup.LastIndexOf('.')
+        if ($lastDot -le 0) { break }
+        $lookup = $lookup.Substring(0, $lastDot)
+    }
+    return $null
 }
 
 # ===================================================================================================
@@ -37,7 +72,7 @@ function MapSharedFolder {
     if ($ExternalMasterID -eq "NotFound") {
         return "Not Shared"
     } else {
-        $SharedFolders[$ExternalMasterID]
+        $script:SharedFolders[$ExternalMasterID]
     }
 }
 
@@ -63,6 +98,7 @@ Creates a Mapping of ExternalMasterID to FolderName
 function CreateExternalMasterIDMap {
     # This function will create a Map of the log folder to ExternalMasterID
     $script:SharedFolders = [System.Collections.SortedList]::new()
+    $unknownCount = 0
     Write-Verbose "Starting CreateExternalMasterIDMap"
 
     foreach ($ExternalID in $script:GCDO.ExternalSharingMasterId | Select-Object -Unique) {
@@ -72,39 +108,55 @@ function CreateExternalMasterIDMap {
 
         $AllFolderNames = @($script:GCDO | Where-Object { $_.ExternalSharingMasterId -eq $ExternalID } | Select-Object -ExpandProperty OriginalParentDisplayName | Select-Object -Unique)
 
+        # Default calendar folder names across the top localized versions of Exchange
+        # cSpell:ignore Kalender Calendario Calendrier Calendário Календарь
+        $DefaultCalendarNames = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        [void]$DefaultCalendarNames.Add('Calendar')       # English
+        [void]$DefaultCalendarNames.Add('Kalender')        # German, Dutch, Swedish, Norwegian, Danish
+        [void]$DefaultCalendarNames.Add('Calendario')      # Spanish, Italian
+        [void]$DefaultCalendarNames.Add('Calendrier')      # French
+        [void]$DefaultCalendarNames.Add('Calendário')     # Portuguese
+        [void]$DefaultCalendarNames.Add('Календарь')      # Russian
+
+        # Remove empty/null entries
+        $AllFolderNames = @($AllFolderNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+
         if ($AllFolderNames.count -gt 1) {
-            # We have 2+ FolderNames, Need to find the best one. Remove 'Calendar' from possible names
-            $AllFolderNames = $AllFolderNames | Where-Object { $_ -notmatch 'Calendar' } # Need a better way to do this for other languages...
+            # We have 2+ FolderNames, remove default calendar folder names (localized) by exact match
+            $Filtered = $AllFolderNames | Where-Object { -not $DefaultCalendarNames.Contains($_) }
+            if ($Filtered.Count -gt 0) {
+                $AllFolderNames = @($Filtered)
+            }
+            # else keep the original list — all entries were default calendar names
         }
 
         if ($AllFolderNames.Count -eq 0) {
-            $SharedFolders[$ExternalID] = "UnknownSharedCalendarCopy"
-            Write-Host -ForegroundColor red "Found Zero to map to."
-        }
-
-        if ($AllFolderNames.Count -eq 1) {
-            $SharedFolders[$ExternalID] = $AllFolderNames
-            Write-Verbose "Found map: [$AllFolderNames] is for $ExternalID"
+            $unknownCount++
+            $script:SharedFolders[$ExternalID] = "UnknownSharedCalendarCopy$unknownCount"
+            Write-Host -ForegroundColor red "Found Zero folder names to map to for ExternalID [$ExternalID]."
+        } elseif ($AllFolderNames.Count -eq 1) {
+            $script:SharedFolders[$ExternalID] = $AllFolderNames[0]
+            Write-Verbose "Found map: [$($AllFolderNames[0])] is for $ExternalID"
         } else {
             # we still have multiple possible Folder Names, need to chose one or combine
             Write-Host -ForegroundColor Red "Unable to Get Exact Folder for $ExternalID"
-            Write-Host -ForegroundColor Red "Found $($AllFolderNames.count) possible folders"
+            Write-Host -ForegroundColor Red "Found $($AllFolderNames.count) possible folders: $($AllFolderNames -join ', ')"
 
             if ($AllFolderNames.Count -eq 2) {
-                $SharedFolders[$ExternalID] = $AllFolderNames[0] + $AllFolderNames[1]
+                $script:SharedFolders[$ExternalID] = $AllFolderNames[0] + " + " + $AllFolderNames[1]
             } else {
-                $SharedFolders[$ExternalID] = "UnknownSharedCalendarCopy"
+                $unknownCount++
+                $script:SharedFolders[$ExternalID] = "UnknownSharedCalendarCopy$unknownCount"
             }
         }
     }
 
     Write-Host -ForegroundColor Green "Created the following Shared Calendar Mapping:"
-    foreach ($Key in $SharedFolders.Keys) {
-        Write-Host -ForegroundColor Green "$Key : $($SharedFolders[$Key])"
+    foreach ($Key in $script:SharedFolders.Keys) {
+        Write-Host -ForegroundColor Green "$Key : $($script:SharedFolders[$Key])"
     }
-    # ToDo: Need to check for multiple ExternalSharingMasterId pointing to the same FolderName
     Write-Verbose "Created the following Mapping :"
-    Write-Verbose $SharedFolders
+    Write-Verbose $script:SharedFolders
 }
 
 <#
@@ -130,8 +182,10 @@ Builds the CSV output from the Calendar Diagnostic Objects
 function BuildCSV {
 
     Write-Host "Starting to Process Calendar Logs..."
-    $GCDOResults = @()
     $script:MailboxList = @{}
+    # Initialize lookup caches to avoid redundant CN resolution across hundreds of log entries
+    $script:SMTPAddressCache = @{}
+    $script:DisplayNameCache = @{}
     Write-Host "Creating Map of Mailboxes to CNs..."
     CreateExternalMasterIDMap
     ConvertCNtoSMTP
@@ -139,9 +193,9 @@ function BuildCSV {
 
     Write-Host "Making Calendar Logs more readable..."
     $Index = 0
-    foreach ($CalLog in $script:GCDO) {
+    $GCDOResults = foreach ($CalLog in $script:GCDO) {
         $Index++
-        $ItemType = $CalendarItemTypes.($CalLog.ItemClass)
+        $ItemType = GetItemType $CalLog.ItemClass
 
         # CleanNotFounds
         $PropsToClean = "FreeBusyStatus", "ClientIntent", "AppointmentSequenceNumber", "AppointmentLastSequenceNumber", "RecurrencePattern", "AppointmentAuxiliaryFlags", "EventEmailReminderTimer", "IsSeriesCancelled", "AppointmentCounterProposal", "MeetingRequestType", "SendMeetingMessagesDiagnostics", "AttendeeCollection"
@@ -152,8 +206,8 @@ function BuildCSV {
             }
         }
 
-        # Record one row
-        $GCDOResults += [PSCustomObject]@{
+        # Output one row (collected by the foreach assignment)
+        [PSCustomObject]@{
             #'LogRow'                         = $Index
             'LogTimestamp'                   = ConvertDateTime($CalLog.LogTimestamp)
             'LogRowType'                     = $CalLog.LogRowType.ToString()
@@ -180,7 +234,7 @@ function BuildCSV {
             'CalendarItemType'               = $CalLog.CalendarItemType.ToString()
             'RecurrencePattern'              = $CalLog.RecurrencePattern
             'AppointmentAuxiliaryFlags'      = $CalLog.AppointmentAuxiliaryFlags.ToString()
-            'DisplayAttendeesAll'            = $CalLog.DisplayAttendeesAll
+            'DisplayAttendeesAll'            = $(if ($CalLog.DisplayAttendeesAll -eq "NotFound") { "-" } else { $CalLog.DisplayAttendeesAll })
             'AttendeeCount'                  = GetAttendeeCount($CalLog.DisplayAttendeesAll)
             'AppointmentState'               = $CalLog.AppointmentState.ToString()
             'ResponseType'                   = $CalLog.ResponseType.ToString()
@@ -189,10 +243,12 @@ function BuildCSV {
             'HasAttachment'                  = $CalLog.HasAttachment
             'IsCancelled'                    = $CalLog.IsCancelled
             'IsAllDayEvent'                  = $CalLog.IsAllDayEvent
+            'Sensitivity'                    = $CalLog.Sensitivity
             'IsSeriesCancelled'              = $CalLog.IsSeriesCancelled
             'SendMeetingMessagesDiagnostics' = $CalLog.SendMeetingMessagesDiagnostics
             'AttendeeCollection'             = MultiLineFormat($CalLog.AttendeeCollection)
             'CalendarLogRequestId'           = $CalLog.CalendarLogRequestId.ToString()    # Move to front.../ Format in groups???
+            'CleanGlobalObjectId'            = $CalLog.CleanGlobalObjectId
         }
     }
     $script:EnhancedCalLogs = $GCDOResults
@@ -210,7 +266,31 @@ function ConvertDateTime {
         $DateTime -eq "NotFound") {
         return ""
     }
-    return [DateTime]$DateTime
+
+    $InvariantCulture = [System.Globalization.CultureInfo]::InvariantCulture
+    $DateStyles = [System.Globalization.DateTimeStyles]::None
+    $Parsed = [DateTime]::MinValue
+
+    # Priority 1 & 2: InvariantCulture TryParse
+    # Handles ISO 8601 and M/d/yyyy (the default EXO output format)
+    if ([DateTime]::TryParse($DateTime, $InvariantCulture, $DateStyles, [ref]$Parsed)) {
+        return $Parsed
+    }
+
+    # Priority 3: Explicit non-US formats via TryParseExact
+    # Reached when day > 12 makes InvariantCulture fail (e.g., "22/07/2024")
+    if ([DateTime]::TryParseExact($DateTime, $script:DateFormats, $InvariantCulture, $DateStyles, [ref]$Parsed)) {
+        return $Parsed
+    }
+
+    # Priority 4: Current culture (last resort for unexpected formats)
+    if ([DateTime]::TryParse($DateTime, [ref]$Parsed)) {
+        return $Parsed
+    }
+
+    # Priority 5: Return MinValue so sorting is not broken by mixed types
+    Write-Warning "Unable to parse date: [$DateTime]"
+    return [DateTime]::MinValue
 }
 
 function GetAttendeeCount {

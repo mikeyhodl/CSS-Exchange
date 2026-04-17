@@ -54,7 +54,11 @@ function FindFirstMeeting {
         $IpmAppointments = $script:GCDO | Where-Object { $_.ItemClass -eq "IPM.Appointment" }
     }
     if ($IpmAppointments.count -eq 0) {
-        Write-Host -ForegroundColor Red "Warning: Cannot find any IPM.Appointments, if this is the Organizer, check for the Outlook Bifurcation issue."
+        if ($script:IsOrganizer) {
+            Write-Host -ForegroundColor Red "Warning: Cannot find any IPM.Appointments for the Organizer. Check for the Outlook Bifurcation issue."
+        } else {
+            Write-Host -ForegroundColor Yellow "Warning: No IPM.Appointments found. This user is not the Organizer, so this may be expected (e.g. delegate without the meeting on their own calendar)."
+        }
         Write-Host -ForegroundColor Red "Warning: No IPM.Appointment found. CalLogs start to expire after 31 days."
         return $null
     } else {
@@ -63,7 +67,7 @@ function FindFirstMeeting {
 }
 
 function BuildTimeline {
-    $script:TimeLineOutput = @()
+    $script:TimeLineOutput = [System.Collections.Generic.List[object]]::new()
 
     $script:FirstLog = FindFirstMeeting
     FindOrganizer($script:FirstLog)
@@ -84,7 +88,7 @@ function BuildTimeline {
 
     Write-DashLineBoxColor "  TimeLine for: [$Identity]",
     "CollectionDate: $($(Get-Date).ToString("yyyy-MM-dd HH:mm:ss"))",
-    "ScriptVersion: $ScriptVersion",
+    "ScriptVersion: $Script:BuildVersion",
     "  Subject: $($script:GCDO[0].NormalizedSubject)",
     "  Organizer: $Script:Organizer",
     "  MeetingID: $($script:GCDO[0].CleanGlobalObjectId)"
@@ -117,7 +121,8 @@ function BuildTimeline {
         }
 
         # Setup Previous log (if current logs is an IPM.Appointment)
-        if ($CalendarItemTypes.($CalLog.ItemClass) -eq "Ipm.Appointment" -or $CalendarItemTypes.($CalLog.ItemClass) -eq "Exception") {
+        if ($null -ne $CalLog.ItemClass -and
+            ((GetItemType $CalLog.ItemClass) -eq "Ipm.Appointment" -or (GetItemType $CalLog.ItemClass) -eq "Exception")) {
             $script:PreviousCalLog = $CalLog
         }
     }
