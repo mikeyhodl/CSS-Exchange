@@ -72,7 +72,8 @@ function GetCalendarDiagnosticObjects {
     param(
         [string]$Identity,
         [string]$Subject,
-        [string]$MeetingID
+        [string]$MeetingID,
+        [datetime]$ExceptionDateOverride
     )
 
     $params = @{
@@ -85,19 +86,26 @@ function GetCalendarDiagnosticObjects {
         ShouldDecodeEnums  = $true
     }
 
+    $isExceptionOverrideCall = $PSBoundParameters.ContainsKey('ExceptionDateOverride') -and $null -ne $ExceptionDateOverride
+
     if ($TrackingLogs -eq $true) {
-        Write-Host -ForegroundColor Yellow "Including Tracking Logs in the output."
+        if (-not $isExceptionOverrideCall) {
+            Write-Host -ForegroundColor Yellow "Including Tracking Logs in the output."
+        }
         $script:CustomPropertyNameList += "AttendeeListDetails", "AttendeeCollection"
         $params.Add("ShouldFetchAttendeeCollection", $true)
         $params.Remove("CustomPropertyName")
         $params.Add("CustomPropertyName", $script:CustomPropertyNameList)
     }
 
-    if (-not [string]::IsNullOrEmpty($ExceptionDate)) {
+    $effectiveExceptionDate = if ($PSBoundParameters.ContainsKey('ExceptionDateOverride') -and $null -ne $ExceptionDateOverride) { $ExceptionDateOverride } else { $ExceptionDate }
+
+    if (-not [string]::IsNullOrEmpty($effectiveExceptionDate)) {
         Write-Host -ForegroundColor Green "---------------------------------------"
-        Write-Host -ForegroundColor Green "Pulling all the Exceptions for [$ExceptionDate] and adding them to the output."
+        $exceptionDateLabel = if ($effectiveExceptionDate -is [datetime]) { $effectiveExceptionDate.ToString('MM/dd/yyyy') } else { [string]$effectiveExceptionDate }
+        Write-Host -ForegroundColor Green "Pulling all the Exceptions for [$exceptionDateLabel] and adding them to the output."
         Write-Host -ForegroundColor Green "---------------------------------------"
-        $params.Add("AnalyzeExceptionWithOriginalStartDate", $ExceptionDate)
+        $params.Add("AnalyzeExceptionWithOriginalStartDate", $effectiveExceptionDate)
     }
 
     if ($MaxLogs.IsPresent) {
@@ -131,7 +139,9 @@ function GetCalendarDiagnosticObjects {
         }
     }
 
-    Write-Host "Found $($CalLogs.count) Calendar Logs for [$Identity]"
+    if (-not $isExceptionOverrideCall) {
+        Write-Host "Found $($CalLogs.count) Calendar Logs for [$Identity]"
+    }
     return $CalLogs
 }
 
@@ -149,6 +159,7 @@ function GetCalLogsWithSubject {
         [string] $Subject
     )
     Write-Host "Getting CalLogs from [$Identity] with subject [$Subject]"
+    $script:CurrentIdentityRunStartTime = Get-Date
 
     $InitialCDOs = GetCalendarDiagnosticObjects -Identity $Identity -Subject $Subject
 
@@ -159,16 +170,40 @@ function GetCalLogsWithSubject {
             $_ -ne "InvalidSchemaPropertyName" -and
             $_.Length -ge 90
         } | Select-Object -Unique)
+    $script:SubjectMeetingIdCount = $GlobalObjectIds.Count
+    $script:SubjectResolvedMeetingId = $null
+    $script:SubjectCanCollectExceptions = $false
+    $script:SubjectSkippedExceptionCollection = $false
     Write-Host "Found $($GlobalObjectIds.count) unique GlobalObjectIds."
     Write-Host "Getting the set of CalLogs for each GlobalObjectID."
 
     if ($GlobalObjectIds.count -eq 1) {
+        $script:SubjectResolvedMeetingId = $GlobalObjectIds[0]
+        $script:SubjectCanCollectExceptions = $Exceptions.IsPresent -and [string]::IsNullOrEmpty($ExceptionDate)
         $script:GCDO = $InitialCDOs; # use the CalLogs that we already have, since there is only one.
+        if ($Exceptions.IsPresent -and [string]::IsNullOrEmpty($ExceptionDate)) {
+            Write-Host -ForegroundColor Yellow "Subject search resolved to one MeetingID [$($script:SubjectResolvedMeetingId)]. Collecting Exceptions by default."
+            Collect-ExceptionLogs -Identity $Identity -MeetingID $script:SubjectResolvedMeetingId
+        } elseif (-not [string]::IsNullOrEmpty($ExceptionDate)) {
+            $script:ExceptionCollectionStatus = "SkippedUntilMeetingIdChosen"
+            Write-Host -ForegroundColor Yellow "Subject search resolved to one MeetingID [$($script:SubjectResolvedMeetingId)], but -ExceptionDate requires rerunning with -MeetingID for targeted Exception collection."
+        } else {
+            $script:ExceptionCollectionStatus = "SkippedBySwitch"
+            Write-Host -ForegroundColor Green "Subject search resolved to one MeetingID [$($script:SubjectResolvedMeetingId)], but Exception collection was skipped."
+        }
         BuildCSV
         BuildTimeline
     } elseif ($GlobalObjectIds.count -gt 1) {
+        $script:SubjectSkippedExceptionCollection = $true
+        $script:ExceptionCollectionStatus = "SkippedMultipleMeetingIds"
         Write-Host "Found multiple GlobalObjectIds: $($GlobalObjectIds.Count)."
+        Write-Host -ForegroundColor Yellow "Exception collection is skipped when Subject search resolves to more than one MeetingID."
+        Write-Host -ForegroundColor Yellow "Re-run with one of these MeetingIDs to collect meeting exceptions:"
         foreach ($MID in $GlobalObjectIds) {
+            Write-Host -ForegroundColor Yellow "  -MeetingID $MID"
+        }
+        foreach ($MID in $GlobalObjectIds) {
+            $script:CurrentIdentityRunStartTime = Get-Date
             Write-DashLineBoxColor "Processing MeetingID: [$MID]"
             $script:GCDO = GetCalendarDiagnosticObjects -Identity $Identity -MeetingID $MID
             Write-Verbose "Found $($GCDO.count) CalLogs with MeetingID[$MID] ."
@@ -176,6 +211,7 @@ function GetCalLogsWithSubject {
             BuildTimeline
         }
     } else {
+        $script:ExceptionCollectionStatus = "NoMeetingId"
         Write-Warning "No CalLogs were found."
     }
 }
