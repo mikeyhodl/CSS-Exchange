@@ -343,7 +343,7 @@ function Write-UnknownTimestampDiagnostics {
     }
 }
 
-function Get-SortedCalendarDiagnosticObjectsByTimestamp {
+function SortCalendarDiagnosticObjectsByTimestamp {
     param(
         [array]$CalLogs
     )
@@ -355,7 +355,7 @@ function Get-SortedCalendarDiagnosticObjectsByTimestamp {
     return @($CalLogs | Sort-Object @{ Expression = { Get-CalendarLogTimestampSortValue $_.LogTimestamp } })
 }
 
-function Get-SortedEnhancedCalendarLogsByTimestamp {
+function SortEnhancedCalendarLogsByTimestamp {
     param(
         [array]$CalLogs
     )
@@ -367,7 +367,7 @@ function Get-SortedEnhancedCalendarLogsByTimestamp {
     return @($CalLogs | Sort-Object @{ Expression = { Get-CalendarLogTimestampSortValue $_.LogTimestamp } })
 }
 
-function Get-SortedCalendarDiagnosticObjects {
+function SortCalendarDiagnosticObjects {
     param(
         [array]$CalLogs
     )
@@ -383,11 +383,11 @@ function Get-SortedCalendarDiagnosticObjects {
             @{ Expression = { Get-CalendarLogOriginalStartDateSortValue $_.OriginalStartDate } })
     } catch {
         Write-Warning "Secondary raw log sort failed; falling back to LogTimestamp-only sorting. $_"
-        return Get-SortedCalendarDiagnosticObjectsByTimestamp -CalLogs $CalLogs
+        return SortCalendarDiagnosticObjectsByTimestamp -CalLogs $CalLogs
     }
 }
 
-function Get-SortedEnhancedCalendarLogs {
+function SortEnhancedCalendarLogs {
     param(
         [array]$CalLogs
     )
@@ -447,7 +447,7 @@ function Get-SortedEnhancedCalendarLogs {
         return @($sortedLogs)
     } catch {
         Write-Warning "Secondary enhanced log sort failed; falling back to LogTimestamp-only sorting. $_"
-        return Get-SortedEnhancedCalendarLogsByTimestamp -CalLogs $CalLogs
+        return SortEnhancedCalendarLogsByTimestamp -CalLogs $CalLogs
     }
 }
 
@@ -580,7 +580,7 @@ Builds the CSV output from the Calendar Diagnostic Objects
 function BuildCSV {
 
     Write-Host "Starting to Process Calendar Logs..."
-    $script:GCDO = Remove-DuplicateCalendarDiagnosticObjects -CalLogs $script:GCDO
+    $script:GCDO = RemoveDuplicateCalendarDiagnosticObjects -CalLogs $script:GCDO
     $rawNullCount = @($script:GCDO).Count - @($script:GCDO | Where-Object { $null -ne $_ }).Count
     if ($rawNullCount -gt 0) {
         Write-Host -ForegroundColor Yellow "Removed [$rawNullCount] null raw calendar log row(s) before processing."
@@ -660,7 +660,7 @@ function BuildCSV {
     [void](Test-LogTimestampOrder -Entries $GCDOResults -Name 'Enhanced Tab before sorting' -ValuePropertyName 'LogTimestamp')
     Write-UnknownTimestampDiagnostics -Entries $GCDOResults -Name 'Enhanced Tab before sorting' -ValuePropertyName 'LogTimestamp'
     # Keep RAW output in collected order; only the Enhanced projection is re-sorted for display and Timeline generation.
-    $script:EnhancedCalLogs = Get-SortedEnhancedCalendarLogs -CalLogs $GCDOResults
+    $script:EnhancedCalLogs = SortEnhancedCalendarLogs -CalLogs $GCDOResults
     [void](Test-LogTimestampOrder -Entries $script:GCDO -Name 'RAW Tab' -ValuePropertyName 'LogTimestamp')
 
     Write-Host -ForegroundColor Green "Calendar Logs have been processed, Exporting logs to file..."

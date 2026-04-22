@@ -287,7 +287,7 @@ if (-not ([string]::IsNullOrEmpty($Subject)) ) {
             }
 
             if ($Exceptions.IsPresent) {
-                Collect-ExceptionLogs -Identity $ID -MeetingID $MeetingID
+                CollectExceptionLogs -Identity $ID -MeetingID $MeetingID
             }
 
             BuildCSV

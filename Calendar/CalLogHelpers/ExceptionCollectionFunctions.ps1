@@ -1,4 +1,4 @@
-# Copyright (c) Microsoft Corporation.
+﻿# Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
 function Read-UInt16LE {
@@ -65,7 +65,7 @@ function Convert-AppointmentRecurrenceBlobToBytes {
     )
 
     if ($AppointmentRecurrenceBlob -is [byte[]]) {
-        return ,$AppointmentRecurrenceBlob
+        return , $AppointmentRecurrenceBlob
     }
 
     $blobText = [string]$AppointmentRecurrenceBlob
@@ -83,7 +83,7 @@ function Convert-AppointmentRecurrenceBlobToBytes {
         $bytes[$index / 2] = [Convert]::ToByte($blobText.Substring($index, 2), 16)
     }
 
-    return ,$bytes
+    return , $bytes
 }
 
 function Get-RecentExceptionCutoff {
@@ -121,7 +121,7 @@ function Get-CalendarDiagnosticObjectDeduplicationKey {
     return "$itemId|$calendarLogRequestId|$logTimestamp|$originalStartDate|$triggerAction|$itemClass|$itemVersion|$logRowType|$responsibleUserName|$clientInfo"
 }
 
-function Remove-DuplicateCalendarDiagnosticObjects {
+function RemoveDuplicateCalendarDiagnosticObjects {
     param(
         [array]$CalLogs,
         [switch]$Quiet
@@ -150,10 +150,10 @@ function Merge-CalendarDiagnosticObjects {
     )
 
     $combinedLogs = @($BaseLogs) + @($AdditionalLogs)
-    return Remove-DuplicateCalendarDiagnosticObjects -CalLogs $combinedLogs -Quiet
+    return RemoveDuplicateCalendarDiagnosticObjects -CalLogs $combinedLogs -Quiet
 }
 
-function Filter-ExceptionLogsByRecency {
+function FilterExceptionLogsByRecency {
     param(
         [array]$ExceptionLogs
     )
@@ -279,7 +279,7 @@ function Get-ExceptionDatesFromMostRecentAppointmentBlob {
     }
 }
 
-function Collect-ExceptionLogsLegacy {
+function CollectExceptionLogsLegacy {
     param(
         [string]$Identity,
         [string]$MeetingID,
@@ -309,7 +309,7 @@ function Collect-ExceptionLogsLegacy {
     $cutoffDate = Get-RecentExceptionCutoff
     if ($null -ne $cutoffDate) {
         Write-Host -ForegroundColor Yellow "Filtering legacy Exception logs to only keep items with OriginalStartDate in the last 6 months."
-        $ExceptionLogs = Filter-ExceptionLogsByRecency -ExceptionLogs $ExceptionLogs
+        $ExceptionLogs = FilterExceptionLogsByRecency -ExceptionLogs $ExceptionLogs
     }
 
     Write-Host -ForegroundColor Cyan "Found $($ExceptionLogs.count) Exception Logs, adding them into the CalLogs."
@@ -321,7 +321,7 @@ function Collect-ExceptionLogsLegacy {
     }
 }
 
-function Collect-ExceptionLogsFast {
+function CollectExceptionLogsFast {
     param(
         [string]$Identity,
         [string]$MeetingID
@@ -360,7 +360,7 @@ function Collect-ExceptionLogsFast {
     $script:ExceptionCollectionStatus = "CollectedFast"
 }
 
-function Collect-ExceptionLogs {
+function CollectExceptionLogs {
     param(
         [string]$Identity,
         [string]$MeetingID
@@ -373,16 +373,16 @@ function Collect-ExceptionLogs {
     if ($IsRecurring) {
         if ($FastExceptions.IsPresent -and [string]::IsNullOrEmpty($ExceptionDate)) {
             try {
-                Collect-ExceptionLogsFast -Identity $Identity -MeetingID $MeetingID
+                CollectExceptionLogsFast -Identity $Identity -MeetingID $MeetingID
             } catch {
                 $script:ExceptionCollectionStatus = "CollectedLegacyFallback"
                 Write-DashLineBoxColor "FAST EXCEPTION COLLECTION FAILED",
                 "Error: $($_.Exception.Message)",
                 "Falling back to the legacy per-appointment Exception collector." -Color Red -DashChar "="
-                Collect-ExceptionLogsLegacy -Identity $Identity -MeetingID $MeetingID -UsedAsFallback
+                CollectExceptionLogsLegacy -Identity $Identity -MeetingID $MeetingID -UsedAsFallback
             }
         } else {
-            Collect-ExceptionLogsLegacy -Identity $Identity -MeetingID $MeetingID
+            CollectExceptionLogsLegacy -Identity $Identity -MeetingID $MeetingID
         }
     } else {
         $script:ExceptionCollectionStatus = "NotRecurring"

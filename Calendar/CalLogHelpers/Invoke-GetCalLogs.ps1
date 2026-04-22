@@ -183,7 +183,7 @@ function GetCalLogsWithSubject {
         $script:GCDO = $InitialCDOs; # use the CalLogs that we already have, since there is only one.
         if ($Exceptions.IsPresent -and [string]::IsNullOrEmpty($ExceptionDate)) {
             Write-Host -ForegroundColor Yellow "Subject search resolved to one MeetingID [$($script:SubjectResolvedMeetingId)]. Collecting Exceptions by default."
-            Collect-ExceptionLogs -Identity $Identity -MeetingID $script:SubjectResolvedMeetingId
+            CollectExceptionLogs -Identity $Identity -MeetingID $script:SubjectResolvedMeetingId
         } elseif (-not [string]::IsNullOrEmpty($ExceptionDate)) {
             $script:ExceptionCollectionStatus = "SkippedUntilMeetingIdChosen"
             Write-Host -ForegroundColor Yellow "Subject search resolved to one MeetingID [$($script:SubjectResolvedMeetingId)], but -ExceptionDate requires rerunning with -MeetingID for targeted Exception collection."
