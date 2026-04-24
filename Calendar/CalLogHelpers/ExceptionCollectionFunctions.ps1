@@ -345,10 +345,11 @@ function CollectExceptionLogsFast {
         return
     }
 
-    $collectedExceptionLogs = @()
-    foreach ($exceptionOriginalStartDate in $exceptionDates) {
-        $collectedExceptionLogs += GetCalendarDiagnosticObjects -Identity $Identity -MeetingID $MeetingID -ExceptionDateOverride $exceptionOriginalStartDate
-    }
+    $collectedExceptionLogs = @(
+        foreach ($exceptionOriginalStartDate in $exceptionDates) {
+            GetCalendarDiagnosticObjects -Identity $Identity -MeetingID $MeetingID -ExceptionDateOverride $exceptionOriginalStartDate
+        }
+    )
 
     $collectedExceptionLogs = @($collectedExceptionLogs | Where-Object {
             $_.ItemClass -notlike "IPM.Appointment*" -or
