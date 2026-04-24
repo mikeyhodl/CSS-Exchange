@@ -409,16 +409,6 @@ function SortEnhancedCalendarLogs {
         Write-Verbose "Starting Sorting Date"
         Write-Verbose "Sorting Enhanced logs by LogTimestamp, then OriginalStartDate for matching timestamps."
 
-        # Temporarily disabled while isolating ordering issues.
-        # $sortedLogs = @($workingLogs | Sort-Object
-        #     @{ Expression = { Get-CalendarLogTimestampSortValue $_.LogTimestamp } },
-        #     @{ Expression = { Get-CalendarLogOriginalStartDateSortRank $_.OriginalStartDate } },
-        #     @{ Expression = { Get-CalendarLogOriginalStartDateSortValue $_.OriginalStartDate } })
-        #
-        # foreach ($timestampGroup in ($sortedLogs | Group-Object { Get-CalendarLogTimestampGroupKey $_.LogTimestamp })) {
-        #     Write-Host -ForegroundColor Cyan "Sub-sorting on [$($timestampGroup.Count)] items on LogTimestamp [$($timestampGroup.Name)]"
-        # }
-
         $sortIndex = 0
         $sortRows = foreach ($workingLog in $workingLogs) {
             $sortIndex++
