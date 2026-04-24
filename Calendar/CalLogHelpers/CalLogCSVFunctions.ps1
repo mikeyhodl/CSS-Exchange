@@ -570,12 +570,26 @@ Builds the CSV output from the Calendar Diagnostic Objects
 function BuildCSV {
 
     Write-Host "Starting to Process Calendar Logs..."
-    $script:GCDO = RemoveDuplicateCalendarDiagnosticObjects -CalLogs $script:GCDO
+    # De-duplicate while preserving the original collection order for RAW output.
     $rawNullCount = @($script:GCDO).Count - @($script:GCDO | Where-Object { $null -ne $_ }).Count
     if ($rawNullCount -gt 0) {
         Write-Host -ForegroundColor Yellow "Removed [$rawNullCount] null raw calendar log row(s) before processing."
     }
-    $script:GCDO = @($script:GCDO | Where-Object { $null -ne $_ })
+    $dedupedCalLogs = New-Object 'System.Collections.Generic.List[object]'
+    $seenCalLogKeys = New-Object 'System.Collections.Generic.HashSet[string]'
+    $duplicateCount = 0
+    foreach ($calLog in @($script:GCDO | Where-Object { $null -ne $_ })) {
+        $calLogKey = Get-CalendarDiagnosticObjectDeduplicationKey -CalLog $calLog
+        if ($seenCalLogKeys.Add($calLogKey)) {
+            [void]$dedupedCalLogs.Add($calLog)
+        } else {
+            $duplicateCount++
+        }
+    }
+    if ($duplicateCount -gt 0) {
+        Write-Host -ForegroundColor Yellow "Removed [$duplicateCount] duplicate Calendar Log entries before processing."
+    }
+    $script:GCDO = @($dedupedCalLogs)
     $script:MailboxList = @{}
     # Initialize lookup caches to avoid redundant CN resolution across hundreds of log entries
     $script:SMTPAddressCache = @{}

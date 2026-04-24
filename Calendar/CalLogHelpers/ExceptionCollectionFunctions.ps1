@@ -65,7 +65,7 @@ function Convert-AppointmentRecurrenceBlobToBytes {
     )
 
     if ($AppointmentRecurrenceBlob -is [byte[]]) {
-        return , $AppointmentRecurrenceBlob
+        return $AppointmentRecurrenceBlob
     }
 
     $blobText = [string]$AppointmentRecurrenceBlob
@@ -83,7 +83,7 @@ function Convert-AppointmentRecurrenceBlobToBytes {
         $bytes[$index / 2] = [Convert]::ToByte($blobText.Substring($index, 2), 16)
     }
 
-    return , $bytes
+    return $bytes
 }
 
 function Get-RecentExceptionCutoff {
