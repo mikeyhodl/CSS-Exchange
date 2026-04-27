@@ -86,7 +86,7 @@ function CreateTimelineRow {
                 }
 
                 $Extra = ""
-                if ($CalLog.CalendarItemType -eq "Exception") {
+                if (IsExceptionLog $CalLog) {
                     $Extra = " to the meeting starting $($CalLog.StartTime)"
                 } elseif ($CalLog.AppointmentRecurring) {
                     $Extra = " to the meeting series"
@@ -112,7 +112,7 @@ function CreateTimelineRow {
         Forward.Notification {
             [array] $Output = "The meeting was FORWARDED by [$($CalLog.Organizer)]."
         }
-        Exception {
+        Exception* {
             if ($CalLog.ResponsibleUser -ne "Calendar Assistant") {
                 [array] $Output = "[$($CalLog.ResponsibleUser)] $($CalLog.TriggerAction)d Exception starting $($CalLog.StartTime) to the meeting series with $($CalLog.Client)."
             }

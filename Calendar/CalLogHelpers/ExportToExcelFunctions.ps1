@@ -15,13 +15,12 @@ function Export-CalLogExcel {
     $savedErrorActionPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'SilentlyContinue'
-        $excel = $GCDOResults | Export-Excel @ExcelParamsArray -PassThru 3>$null
+        $excel = $script:EnhancedCalLogs | Export-Excel @ExcelParamsArray -PassThru 3>$null
     } finally {
         $ErrorActionPreference = $savedErrorActionPreference
     }
 
     FormatHeader ($excel)
-    SortByLogTimestamp ($excel)
     CheckRows ($excel)
 
     # Set tab color to match the role (Organizer=Orange, Room=Green, Attendee=Blue)
@@ -32,16 +31,149 @@ function Export-CalLogExcel {
     # Log script info (will be positioned in the middle)
     LogScriptInfo
 
-    # Export Raw Logs for Developer Analysis
+    # Export Raw Logs for Developer Analysis in collected order; do not apply the Enhanced tab sort here.
     Write-Host -ForegroundColor Cyan "Exporting Raw CalLogs to Excel Tab [$($ShortId + "_Raw")]..."
     try {
         $ErrorActionPreference = 'SilentlyContinue'
-        $rawExcel = $script:GCDO | Export-Excel -Path $FileName -WorksheetName $($ShortId + "_Raw") -AutoFilter -FreezeTopRow -BoldTopRow -MoveToEnd -PassThru 3>$null
+        $rawExcel = $script:GCDO | Export-Excel -Path $FileName -WorksheetName $($ShortId + "_Raw") -AutoFilter -FreezeTopRow -BoldTopRow -MoveToEnd -ClearSheet -PassThru 3>$null
     } finally {
         $ErrorActionPreference = $savedErrorActionPreference
     }
     $rawExcel.Workbook.Worksheets[$ShortId + "_Raw"].TabColor = $script:TabColor
     Export-Excel -ExcelPackage $rawExcel -WorksheetName $($ShortId + "_Raw")
+}
+
+function Format-ElapsedTime {
+    param(
+        [TimeSpan]$Elapsed
+    )
+
+    if ($Elapsed.TotalHours -ge 1) {
+        return ('{0:00}:{1:00}:{2:00}' -f [int]$Elapsed.TotalHours, $Elapsed.Minutes, $Elapsed.Seconds)
+    }
+
+    return ('{0:00}:{1:00}' -f [int]$Elapsed.TotalMinutes, $Elapsed.Seconds)
+}
+
+function Get-ExceptionSummaryText {
+    $exceptionLogs = @($script:GCDO | Where-Object {
+            ($null -ne $_.OriginalStartDate -and $_.OriginalStartDate -ne 'NotFound' -and -not [string]::IsNullOrEmpty([string]$_.OriginalStartDate)) -or
+            (IsExceptionItemType (GetItemType $_.ItemClass))
+        })
+    $exceptionCount = $exceptionLogs.Count
+
+    switch ($script:ExceptionCollectionStatus) {
+        'CollectedFast' {
+            if ($AllExceptions.IsPresent) {
+                return "Yes - $exceptionCount exception log(s) collected with FastExceptions for all Exception dates."
+            }
+            return "Yes - $exceptionCount exception log(s) collected with FastExceptions for the last 6 months by default."
+        }
+        'CollectedLegacyFallback' {
+            if ($AllExceptions.IsPresent) {
+                return "Yes - $exceptionCount exception log(s) collected after FastExceptions fell back to the legacy collector for all Exception dates."
+            }
+            return "Yes - $exceptionCount exception log(s) collected after FastExceptions fell back to the legacy collector for the last 6 months by default."
+        }
+        'Collected' {
+            return "Yes - $exceptionCount exception log(s) collected."
+        }
+        'NoExceptionDates' {
+            return "No - the AppointmentRecurrenceBlob did not expose matching Exception dates."
+        }
+        'NotRecurring' {
+            return "No - the meeting is not recurring."
+        }
+        'SkippedBySwitch' {
+            return "No - skipped because -NoExceptions was used."
+        }
+        'SkippedUntilMeetingIdChosen' {
+            return "No - skipped because -ExceptionDate requires rerunning with -MeetingID."
+        }
+        'SkippedMultipleMeetingIds' {
+            return "No - skipped because Subject search resolved to multiple MeetingIDs."
+        }
+        'NoMeetingId' {
+            return "No - no MeetingID was resolved from the Subject search."
+        }
+        default {
+            if (-not $Exceptions.IsPresent) {
+                return "No - Exception collection was not requested."
+            }
+            if ($exceptionCount -gt 0) {
+                return "Yes - $exceptionCount exception log(s) present in the collected output."
+            }
+            return "No - no exception logs were found in the collected output."
+        }
+    }
+}
+
+function Get-CollectionMethodDescription {
+    if ($script:SubjectSearch) {
+        if ($script:SubjectMeetingIdCount -eq 1) {
+            if ($script:ExceptionCollectionStatus -eq 'CollectedFast') {
+                if ($AllExceptions.IsPresent) {
+                    return 'Subject search resolved to one MeetingID; Exception data collected with FastExceptions for all Exception dates. Tracking Logs still require -MeetingID.'
+                }
+                return 'Subject search resolved to one MeetingID; Exception data collected with FastExceptions for the last 6 months by default. Tracking Logs still require -MeetingID.'
+            }
+            if ($script:ExceptionCollectionStatus -eq 'CollectedLegacyFallback') {
+                if ($AllExceptions.IsPresent) {
+                    return 'Subject search resolved to one MeetingID; FastExceptions failed and the script fell back to the legacy Exception collector for all Exception dates. Tracking Logs still require -MeetingID.'
+                }
+                return 'Subject search resolved to one MeetingID; FastExceptions failed and the script fell back to the legacy Exception collector for the last 6 months by default. Tracking Logs still require -MeetingID.'
+            }
+            if ($script:ExceptionCollectionStatus -eq 'Collected') {
+                return 'Subject search resolved to one MeetingID; Exception data collected by default. Tracking Logs still require -MeetingID.'
+            }
+            if ($script:ExceptionCollectionStatus -eq 'SkippedBySwitch') {
+                return 'Subject search resolved to one MeetingID; Exception collection was skipped because -NoExceptions was used. Tracking Logs still require -MeetingID.'
+            }
+            if ($script:ExceptionCollectionStatus -eq 'SkippedUntilMeetingIdChosen') {
+                return 'Subject search resolved to one MeetingID; targeted Exception collection was skipped because -ExceptionDate requires rerunning with -MeetingID. Tracking Logs still require -MeetingID.'
+            }
+            if ($script:ExceptionCollectionStatus -eq 'NoExceptionDates') {
+                return 'Subject search resolved to one MeetingID; the AppointmentRecurrenceBlob did not expose any matching Exception dates to collect. Tracking Logs still require -MeetingID.'
+            }
+            if ($script:ExceptionCollectionStatus -eq 'NotRecurring') {
+                return 'Subject search resolved to one MeetingID; Exception lookup ran, but the meeting is not recurring. Tracking Logs still require -MeetingID.'
+            }
+            return 'Subject search resolved to one MeetingID. Tracking Logs still require -MeetingID for full collection.'
+        }
+        if ($script:SubjectMeetingIdCount -gt 1) {
+            return 'Subject search resolved to multiple MeetingIDs; Exception collection was skipped. Re-run with a specific -MeetingID to collect meeting exceptions.'
+        }
+        return 'Subject search did not resolve to a MeetingID.'
+    }
+
+    if (-not [string]::IsNullOrEmpty($ExceptionDate)) {
+        return 'MeetingID search with targeted -ExceptionDate collection.'
+    }
+    if ($NoExceptions.IsPresent) {
+        return 'MeetingID search with Exception collection disabled by -NoExceptions.'
+    }
+    if ($script:ExceptionCollectionStatus -eq 'CollectedFast') {
+        if ($AllExceptions.IsPresent) {
+            return 'MeetingID search with FastExceptions collection for all Exception dates.'
+        }
+        return 'MeetingID search with FastExceptions collection for the last 6 months by default.'
+    }
+    if ($script:ExceptionCollectionStatus -eq 'CollectedLegacyFallback') {
+        if ($AllExceptions.IsPresent) {
+            return 'MeetingID search where FastExceptions failed and the script fell back to the legacy Exception collector for all Exception dates.'
+        }
+        return 'MeetingID search where FastExceptions failed and the script fell back to the legacy Exception collector for the last 6 months by default.'
+    }
+    if ($script:ExceptionCollectionStatus -eq 'Collected') {
+        return 'MeetingID search with legacy Exception collection.'
+    }
+    if ($script:ExceptionCollectionStatus -eq 'NoExceptionDates') {
+        return 'MeetingID search where the AppointmentRecurrenceBlob did not expose any matching Exception dates to collect.'
+    }
+    if ($script:ExceptionCollectionStatus -eq 'NotRecurring') {
+        return 'MeetingID search where the meeting is not recurring, so no Exception logs were collected.'
+    }
+    return 'MeetingID'
 }
 
 function LogScriptInfo {
@@ -119,17 +251,10 @@ function LogScriptInfo {
                 Value = ($ValidatedIdentities -join '; ')
             })
 
-        if ($script:SubjectSearch) {
-            $RunInfo.Add([PSCustomObject]@{
-                    Key   = "Collection Method"
-                    Value = "Subject search (no Exception or Tracking Log data). Use -MeetingID for full collection."
-                })
-        } else {
-            $RunInfo.Add([PSCustomObject]@{
-                    Key   = "Collection Method"
-                    Value = "MeetingID"
-                })
-        }
+        $RunInfo.Add([PSCustomObject]@{
+                Key   = "Collection Method"
+                Value = (Get-CollectionMethodDescription)
+            })
 
         # Only log environment info on the first run
         if ($script:RunNumber -eq 1) {
@@ -156,9 +281,21 @@ function LogScriptInfo {
 
     # Per-identity line: show which identity was collected and log count
     $logCount = if ($null -ne $script:GCDO) { $script:GCDO.Count } else { 0 }
+    $elapsedText = 'Unknown'
+    if ($null -ne $script:CurrentIdentityRunStartTime) {
+        $elapsedText = Format-ElapsedTime -Elapsed ((Get-Date) - $script:CurrentIdentityRunStartTime)
+    }
     $RunInfo.Add([PSCustomObject]@{
             Key   = "  $($script:Identity)"
-            Value = "$logCount logs collected at $(Get-Date -Format 'HH:mm:ss')"
+            Value = "$logCount logs collected in $elapsedText at $(Get-Date -Format 'HH:mm:ss')"
+        })
+    $RunInfo.Add([PSCustomObject]@{
+            Key   = "    Duration"
+            Value = $elapsedText
+        })
+    $RunInfo.Add([PSCustomObject]@{
+            Key   = "    Exceptions"
+            Value = (Get-ExceptionSummaryText)
         })
 
     # Capture errors that occurred during this identity (new errors since last snapshot)
@@ -237,7 +374,7 @@ function Export-TimelineExcel {
     $savedEAP = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'SilentlyContinue'
-        $tlExcel = $script:TimeLineOutput | Export-Excel -Path $FileName -WorksheetName $($ShortId + "_TimeLine") -Title "Timeline for $Identity" -AutoSize -FreezeTopRow -BoldTopRow -PassThru 3>$null
+        $tlExcel = $script:TimeLineOutput | Export-Excel -Path $FileName -WorksheetName $($ShortId + "_TimeLine") -Title "Timeline for $Identity" -AutoSize -FreezeTopRow -BoldTopRow -ClearSheet -PassThru 3>$null
     } finally {
         $ErrorActionPreference = $savedEAP
     }
@@ -267,7 +404,29 @@ function GetExcelParams($path, $tabName) {
     }
 
     if ($script:SubjectSearch) {
-        $TitleExtra += ", Collected with Subject search (no Exception info)"
+        if ($script:SubjectMeetingIdCount -eq 1) {
+            if ($script:ExceptionCollectionStatus -eq "CollectedFast") {
+                $TitleExtra += ", Collected with Subject search and FastExceptions"
+            } elseif ($script:ExceptionCollectionStatus -eq "CollectedLegacyFallback") {
+                $TitleExtra += ", Collected with Subject search (FastExceptions fell back to legacy)"
+            } elseif ($script:ExceptionCollectionStatus -eq "Collected") {
+                $TitleExtra += ", Collected with Subject search and Exception data"
+            } elseif ($script:ExceptionCollectionStatus -eq "SkippedBySwitch") {
+                $TitleExtra += ", Collected with Subject search (-NoExceptions used)"
+            } elseif ($script:ExceptionCollectionStatus -eq "SkippedUntilMeetingIdChosen") {
+                $TitleExtra += ", Collected with Subject search (-ExceptionDate requires rerun with -MeetingID)"
+            } elseif ($script:ExceptionCollectionStatus -eq "NoExceptionDates") {
+                $TitleExtra += ", Collected with Subject search (no matching Exception dates in AppointmentRecurrenceBlob)"
+            } elseif ($script:ExceptionCollectionStatus -eq "NotRecurring") {
+                $TitleExtra += ", Collected with Subject search (no recurring Exception data)"
+            } else {
+                $TitleExtra += ", Collected with Subject search"
+            }
+        } elseif ($script:SubjectMeetingIdCount -gt 1) {
+            $TitleExtra += ", Collected with Subject search (multiple MeetingIDs; rerun with -MeetingID for Exceptions)"
+        } else {
+            $TitleExtra += ", Collected with Subject search"
+        }
     }
 
     $script:lastRow = $script:GCDO.Count + $firstRow - 1 # Last row is the number of items in the GCDO array + 2 for the header and title rows.
@@ -283,7 +442,7 @@ function GetExcelParams($path, $tabName) {
         TableName               = $tabName
         FreezeTopRowFirstColumn = $true
         AutoFilter              = $true
-        Append                  = $true
+        ClearSheet              = $true
         Title                   = "Enhanced Calendar Logs for $Identity" + $TitleExtra + " for MeetingID [$($script:GCDO[0].CleanGlobalObjectId)]."
         TitleSize               = 14
         ConditionalText         = $ConditionalFormatting
@@ -551,7 +710,7 @@ function CheckOrganizerErrors {
         $sharedFolder = $sheet.Cells[$row, $sharedFolderCol].Text
 
         # Only check IPM.Appointment and Exception rows that are not shared
-        if (($itemClass -ne "Ipm.Appointment" -and $itemClass -ne "Exception") -or
+        if (($itemClass -ne "Ipm.Appointment" -and $itemClass -notlike "Exception*") -or
             $sharedFolder -ne "Not Shared") {
             continue
         }
@@ -577,7 +736,7 @@ function CheckOrganizerErrors {
 
         if ($null -eq $firstOrganizer) {
             $firstOrganizer = $fromValue
-        } elseif ($fromValue -ne $firstOrganizer) {
+        } elseif (-not (IsSameOrganizerIdentity $fromValue $firstOrganizer)) {
             # Red text for the whole row
             $rowRange = $sheet.Cells[$row, 1, $row, $lastDataCol]
             $rowRange.Style.Font.Color.SetColor([System.Drawing.Color]::Red)

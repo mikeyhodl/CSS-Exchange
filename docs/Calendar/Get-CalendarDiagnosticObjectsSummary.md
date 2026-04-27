@@ -4,6 +4,8 @@ Download the latest release: [Get-CalendarDiagnosticObjectsSummary.ps1](https://
 
 This script runs the Get-CalendarDiagnosticObjects cmdlet and returns a summarized timeline of actions in clear English as well as the Calendar Diagnostic Objects in Excel.
 
+> **New feature:** `-FastExceptions` uses the recurring meeting's `AppointmentRecurrenceBlob` to identify exception dates first, then collects those occurrences directly. This is the fastest option when investigating recurring meeting exceptions, and it now collects the last 6 months by default. Add `-AllExceptions` to collect every exception date instead.
+
 ## Prerequisites
 
 1. Install the [ImportExcel](https://github.com/dfinke/ImportExcel) module (required for the default Excel export):
@@ -39,7 +41,7 @@ Collect from **all key participants** upfront. Partial collections produce incom
 
 Using **-MeetingID** (the `CleanGlobalObjectId`) is the preferred collection method. It produces more detailed logs than a subject search and allows collecting for multiple participants in a single run.
 
-Using **-Subject** performs a case-insensitive substring match. Only a single `-Identity` can be used with `-Subject`. If multiple meetings match, the script creates a separate file for each match.
+Using **-Subject** performs a case-insensitive substring match. Only a single `-Identity` can be used with `-Subject`. If multiple meetings match, the script creates a separate file for each match. Exception collection still runs by default only when the subject search resolves to exactly one `MeetingID`. Tracking logs still require **-MeetingID**.
 
 | Parameter | Explanation |
 |:--- |:---|
@@ -51,6 +53,8 @@ Using **-Subject** performs a case-insensitive substring match. Only a single `-
 | **-Exceptions** | Exceptions are collected by default for recurring meetings. This switch is kept for backward compatibility but is no longer required. Use `-NoExceptions` to skip or `-ExceptionDate` to collect a single occurrence. |
 | **-NoExceptions** | Do not collect Exception Meetings. |
 | **-ExceptionDate** | Date of a specific Exception Meeting to collect logs for. <BR> - Fastest way to get logs for a single occurrence of a recurring meeting. |
+| **-FastExceptions** | **New feature.** Parse the meeting's `AppointmentRecurrenceBlob` to find exception dates first, then collect those occurrences directly. This fast path collects the last 6 months by default. If blob parsing fails, the script falls back to the legacy per-appointment exception collector. |
+| **-AllExceptions** | When used with `-FastExceptions`, collect all exception dates instead of the default last 6 months. |
 | **-ExportToExcel** | Export the output to an Excel file with formatting (Default). <BR> - Creates three tabs per user (Enhanced, Raw, Timeline) plus a shared Script Info tab. <BR> - To add more users later, close the file and rerun with the new user only. |
 | **-ExportToCSV** | Export the output to 3 CSV files per user instead of Excel. |
 | **-CaseNumber** | Case Number to include in the Filename of the output. <BR> - Prepend `<CaseNumber>_` to filename. |
@@ -118,6 +122,16 @@ Will create file like  `.\123456_CalLogSummary_<MeetingID>.xlsx` in current dire
 Collect logs for a specific Exception date:
 ```PowerShell
 Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -ExceptionDate "01/28/2024" -CaseNumber 123456
+```
+
+Collect recurring meeting exceptions with the new fast path:
+```PowerShell
+Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -FastExceptions
+```
+
+Collect all recurring meeting exceptions with the new fast path:
+```PowerShell
+Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -FastExceptions -AllExceptions
 ```
 
 ## Validate your collection

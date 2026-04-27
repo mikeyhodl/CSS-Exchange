@@ -20,7 +20,7 @@ function HasMeaningfulChange {
         $OldValue,
         $NewValue
     )
-    if ($OldValue -eq $NewValue) { return $false }
+    if ([string]::Equals([string]$OldValue, [string]$NewValue, [System.StringComparison]::OrdinalIgnoreCase)) { return $false }
     if ((IsNotFound $OldValue) -or (IsNotFound $NewValue)) { return $false }
     return $true
 }
@@ -133,13 +133,17 @@ function FindChangedProperties {
             }
 
             if (HasMeaningfulChange $script:PreviousCalLog.Sender $CalLog.Sender) {
-                [Array]$TimeLineText = "The Sender Email Address changed from [$($script:PreviousCalLog.Sender)] to: [$($CalLog.Sender)]"
-                CreateMeetingSummary -Time " " -MeetingChanges $TimeLineText
+                if (-not (IsSameOrganizerIdentity $script:PreviousCalLog.Sender $CalLog.Sender)) {
+                    [Array]$TimeLineText = "The Sender Email Address changed from [$($script:PreviousCalLog.Sender)] to: [$($CalLog.Sender)]"
+                    CreateMeetingSummary -Time " " -MeetingChanges $TimeLineText
+                }
             }
 
             if (HasMeaningfulChange $script:PreviousCalLog.From $CalLog.From) {
-                [Array]$TimeLineText = "The From changed from [$($script:PreviousCalLog.From)] to: [$($CalLog.From)]"
-                CreateMeetingSummary -Time " " -MeetingChanges $TimeLineText
+                if (-not (IsSameOrganizerIdentity $script:PreviousCalLog.From $CalLog.From)) {
+                    [Array]$TimeLineText = "The From changed from [$($script:PreviousCalLog.From)] to: [$($CalLog.From)]"
+                    CreateMeetingSummary -Time " " -MeetingChanges $TimeLineText
+                }
             }
 
             if (HasMeaningfulChange $script:PreviousCalLog.ReceivedRepresenting $CalLog.ReceivedRepresenting) {

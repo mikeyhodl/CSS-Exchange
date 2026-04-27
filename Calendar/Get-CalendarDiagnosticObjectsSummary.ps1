@@ -22,7 +22,7 @@ Include specific tracking logs in the output. Only usable with the MeetingID par
 Do not collect Tracking Logs.
 
 .PARAMETER Exceptions
-Include Exception objects in the output. Only usable with the MeetingID parameter. Collected by default; use -NoExceptions to skip.
+Include Exception objects in the output. Collected by default for direct MeetingID searches and for Subject searches that resolve to exactly one MeetingID; use -NoExceptions to skip.
 
 .PARAMETER ExportToExcel
 Export the output to an Excel file with formatting.  Running the script for multiple users will create multiple tabs in the Excel file. (Default)
@@ -43,15 +43,23 @@ Increase log limit to 12,000 in case the default 2000 does not contain the neede
 Advanced users can add custom properties to the output in the RAW output. This is not recommended unless you know what you are doing. The properties must be in the format of "PropertyName1, PropertyName2, PropertyName3". The properties will only be added to the RAW output.
 
 .PARAMETER ExceptionDate
-Date of the Exception Meeting to collect logs for.  Fastest way to get Exceptions for a meeting.
+Date of the Exception Meeting to collect logs for. Fastest way to get Exceptions for a meeting after you have identified the MeetingID.
 
 .PARAMETER NoExceptions
 Do not collect Exception Meetings.  This was the default behavior of the script, now exceptions are collected by default.
+
+.PARAMETER FastExceptions
+Use the AppointmentRecurrenceBlob to find Exception dates, then collect them with -ExceptionDate. Fast exception collection uses the last 6 months by default. If parsing fails, the script falls back to the legacy per-appointment collector.
+
+.PARAMETER AllExceptions
+When using -FastExceptions, collect all Exception dates instead of the default last 6 months.
 
 .EXAMPLE
 Get-CalendarDiagnosticObjectsSummary.ps1 -Identity someuser@microsoft.com -MeetingID 040000008200E00074C5B7101A82E008000000008063B5677577D9010000000000000000100000002FCDF04279AF6940A5BFB94F9B9F73CD
 .EXAMPLE
 Get-CalendarDiagnosticObjectsSummary.ps1 -Identity someuser@microsoft.com -Subject "Test One Meeting Subject"
+.EXAMPLE
+Get-CalendarDiagnosticObjectsSummary.ps1 -Identity someuser@microsoft.com -Subject "Test One Meeting Subject" -NoExceptions
 .EXAMPLE
 Get-CalendarDiagnosticObjectsSummary.ps1 -Identity User1, User2, Delegate -MeetingID $MeetingID
 .EXAMPLE
@@ -62,6 +70,10 @@ Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID 
 Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -ExportToExcel -CaseNumber 123456
 .EXAMPLE
 Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -ExceptionDate "01/28/2024" -CaseNumber 123456
+.EXAMPLE
+Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -FastExceptions
+.EXAMPLE
+Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -FastExceptions -AllExceptions
 
 .SYNOPSIS
 Used to collect easy to read Calendar Logs.
@@ -94,12 +106,16 @@ param (
     [switch]$TrackingLogs,
     [Parameter(HelpMessage = "Do Not collect Tracking Logs.")]
     [switch]$NoTrackingLogs,
-    [Parameter(HelpMessage = "Include Exception objects in the output. Only usable with the MeetingID parameter.")]
+    [Parameter(HelpMessage = "Include Exception objects in the output. Subject searches also collect them when exactly one MeetingID is found.")]
     [switch]$Exceptions,
-    [Parameter(HelpMessage = "Date of the Exception to collect the logs for.")]
+    [Parameter(HelpMessage = "Date of the Exception to collect the logs for after identifying the MeetingID.")]
     [DateTime]$ExceptionDate,
     [Parameter(HelpMessage = "Do Not collect Exception Meetings.")]
     [switch]$NoExceptions,
+    [Parameter(HelpMessage = "Use AppointmentRecurrenceBlob to collect exceptions by ExceptionDate first, then fall back to the legacy path if parsing fails.")]
+    [switch]$FastExceptions,
+    [Parameter(HelpMessage = "When using FastExceptions, collect all Exception dates instead of the default last 6 months.")]
+    [switch]$AllExceptions,
 
     [Parameter(Mandatory, ParameterSetName = 'Subject', Position = 1, HelpMessage = "Enter the Subject of the meeting. Do not include the RE:, FW:, etc.,  No wild cards (* or ?)")]
     [string]$Subject
@@ -124,6 +140,12 @@ Write-Verbose "Name:  $($script:command.MyCommand.name)"
 Write-Verbose "Command Line:  $($script:command.line)"
 Write-Verbose "Script Version: $BuildVersion"
 $script:BuildVersion = $BuildVersion
+$script:SubjectSearch = $false
+$script:SubjectMeetingIdCount = 0
+$script:SubjectResolvedMeetingId = $null
+$script:SubjectCanCollectExceptions = $false
+$script:SubjectSkippedExceptionCollection = $false
+$script:ExceptionCollectionStatus = $null
 
 # ===================================================================================================
 # Support scripts
@@ -134,6 +156,7 @@ $script:BuildVersion = $BuildVersion
 . $PSScriptRoot\CalLogHelpers\Invoke-GetMailbox.ps1
 . $PSScriptRoot\CalLogHelpers\Invoke-GetCalLogs.ps1
 . $PSScriptRoot\CalLogHelpers\CalLogInfoFunctions.ps1
+. $PSScriptRoot\CalLogHelpers\ExceptionCollectionFunctions.ps1
 . $PSScriptRoot\CalLogHelpers\CalLogExportFunctions.ps1
 . $PSScriptRoot\CalLogHelpers\CreateTimelineRow.ps1
 . $PSScriptRoot\CalLogHelpers\FindChangedPropFunctions.ps1
@@ -149,6 +172,10 @@ if (!$ExportToCSV.IsPresent) {
     . $PSScriptRoot\CalLogHelpers\ExportToExcelFunctions.ps1
 }
 
+if ($AllExceptions.IsPresent -and -not $FastExceptions.IsPresent) {
+    Write-Warning "-AllExceptions only applies when -FastExceptions is used. The switch will be ignored."
+}
+
 # Default to Collecting Tracking Logs (MeetingID only)
 if (-not ([string]::IsNullOrEmpty($MeetingID))) {
     if (!$NoTrackingLogs.IsPresent) {
@@ -159,11 +186,19 @@ if (-not ([string]::IsNullOrEmpty($MeetingID))) {
         Write-Host -ForegroundColor Green "Not Collecting Tracking Logs."
     }
 
-    # Default to Collecting Exceptions (MeetingID only)
+    # Default to Collecting Exceptions
     if ((!$NoExceptions.IsPresent) -and ([string]::IsNullOrEmpty($ExceptionDate))) {
-        $Exceptions=$true
+        $Exceptions = $true
         Write-Host -ForegroundColor Yellow "Collecting Exceptions."
         Write-Host -ForegroundColor Yellow "`tTo skip collecting Exceptions, use the -NoExceptions switch."
+        if ($FastExceptions.IsPresent) {
+            Write-Host -ForegroundColor Yellow "`tFast exception collection is enabled and will parse AppointmentRecurrenceBlob first."
+            if ($AllExceptions.IsPresent) {
+                Write-Host -ForegroundColor Yellow "`tAll Exception dates will be collected."
+            } else {
+                Write-Host -ForegroundColor Yellow "`tOnly Exception dates from the last 6 months will be collected by default."
+            }
+        }
     } else {
         Write-Host -ForegroundColor Green "---------------------------------------"
         if ($NoExceptions.IsPresent) {
@@ -176,8 +211,27 @@ if (-not ([string]::IsNullOrEmpty($MeetingID))) {
 } else {
     # Subject-based search
     $script:SubjectSearch = $true
-    Write-Host -ForegroundColor Yellow "Using Subject search. Tracking Logs and Exception collection are only available with -MeetingID."
-    Write-Host -ForegroundColor Yellow "`tTip: Use the MeetingID from this output to recollect with full details."
+    if ((!$NoExceptions.IsPresent) -and ([string]::IsNullOrEmpty($ExceptionDate))) {
+        $Exceptions = $true
+        Write-Host -ForegroundColor Yellow "Using Subject search. Exception collection will run if the search resolves to exactly one MeetingID."
+        Write-Host -ForegroundColor Yellow "`tTo skip collecting Exceptions for a single resolved MeetingID, use the -NoExceptions switch."
+        if ($FastExceptions.IsPresent) {
+            Write-Host -ForegroundColor Yellow "`tFast exception collection is enabled for single-MeetingID Subject results."
+            if ($AllExceptions.IsPresent) {
+                Write-Host -ForegroundColor Yellow "`tAll Exception dates will be collected."
+            } else {
+                Write-Host -ForegroundColor Yellow "`tOnly Exception dates from the last 6 months will be collected by default."
+            }
+        }
+    } else {
+        Write-Host -ForegroundColor Green "Using Subject search without automatic Exception collection."
+        if ($NoExceptions.IsPresent) {
+            Write-Host -ForegroundColor Green "`t-NoExceptions was specified, so Exception collection will be skipped."
+        } elseif (-not ([string]::IsNullOrEmpty($ExceptionDate))) {
+            Write-Host -ForegroundColor Green "`t-ExceptionDate applies only after a specific MeetingID is selected."
+        }
+    }
+    Write-Host -ForegroundColor Yellow "`tTracking Logs still require running the script with -MeetingID."
 }
 
 # ===================================================================================================
@@ -200,6 +254,7 @@ if (-not ([string]::IsNullOrEmpty($Subject)) ) {
         exit
     }
     $script:Identity = $ValidatedIdentities[0]
+    $script:CurrentIdentityRunStartTime = Get-Date
     GetCalLogsWithSubject -Identity $ValidatedIdentities -Subject $Subject
 } elseif (-not ([string]::IsNullOrEmpty($MeetingID))) {
     #Validate MeetingID is good
@@ -212,6 +267,7 @@ if (-not ([string]::IsNullOrEmpty($Subject)) ) {
     }
     # Process Logs based off Passed in MeetingID
     foreach ($ID in $ValidatedIdentities) {
+        $script:CurrentIdentityRunStartTime = Get-Date
         Write-DashLineBoxColor "Looking for CalLogs from [$ID] with passed in MeetingID."
         Write-Verbose "Running: Get-CalendarDiagnosticObjects -Identity [$ID] -MeetingID [$MeetingID] -CustomPropertyNames $CustomPropertyNameList -WarningAction Ignore -MaxResults $LogLimit -ResultSize $LogLimit -ShouldBindToItem $true;"
         [array] $script:GCDO = GetCalendarDiagnosticObjects -Identity $ID -MeetingID $MeetingID
@@ -231,40 +287,7 @@ if (-not ([string]::IsNullOrEmpty($Subject)) ) {
             }
 
             if ($Exceptions.IsPresent) {
-                Write-Verbose "Looking for Exception Logs..."
-                $IsRecurring = SetIsRecurring -CalLogs $script:GCDO
-                Write-Verbose "Meeting IsRecurring: $IsRecurring"
-
-                if ($IsRecurring) {
-                    #collect Exception Logs
-                    $ExceptionLogs = @()
-                    $LogToExamine = @()
-                    $LogToExamine = $script:GCDO | Where-Object { $_.ItemClass -like 'IPM.Appointment*' } | Sort-Object ItemVersion
-
-                    Write-Host -ForegroundColor Cyan "Found $($LogToExamine.count) CalLogs to examine for Exception Logs."
-                    if ($LogToExamine.count -gt 100) {
-                        Write-Host -ForegroundColor Cyan "`t This is a large number of logs to examine, this may take a while."
-                    }
-                    $logLeftCount = $LogToExamine.count
-
-                    $ExceptionLogs = $LogToExamine | ForEach-Object {
-                        $logLeftCount -= 1
-                        Write-Verbose "Getting Exception Logs for [$($_.ItemId.ObjectId)]"
-                        Get-CalendarDiagnosticObjects -Identity $ID -ItemIds $_.ItemId.ObjectId -ShouldFetchRecurrenceExceptions $true -CustomPropertyNames $CustomPropertyNameList -ShouldBindToItem $true 3>$null
-                        if (($logLeftCount % 10 -eq 0) -and ($logLeftCount -gt 0)) {
-                            Write-Host -ForegroundColor Cyan "`t [$($logLeftCount)] logs left to examine..."
-                        }
-                    }
-                    # Remove the IPM.Appointment logs as they are already in the CalLogs.
-                    $ExceptionLogs = $ExceptionLogs | Where-Object { $_.ItemClass -notlike "IPM.Appointment*" }
-                    Write-Host -ForegroundColor Cyan "Found $($ExceptionLogs.count) Exception Logs, adding them into the CalLogs."
-
-                    $script:GCDO = $script:GCDO + $ExceptionLogs | Select-Object *, @{n='OrgTime'; e= { ConvertDateTime($_.LogTimestamp.ToString()) } } | Sort-Object OrgTime
-                    $LogToExamine = $null
-                    $ExceptionLogs = $null
-                } else {
-                    Write-Host -ForegroundColor Cyan "No Recurring Meetings found, no Exception Logs to collect."
-                }
+                CollectExceptionLogs -Identity $ID -MeetingID $MeetingID
             }
 
             BuildCSV
