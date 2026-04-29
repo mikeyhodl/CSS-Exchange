@@ -191,7 +191,7 @@ begin {
         $groupMembers = $null
         Write-Verbose "Getting $GroupObjectId"
         try {
-            $groupMembers = Get-MgGroupMember -GroupId $GroupObjectId -ErrorAction Stop
+            $groupMembers = Get-MgGroupMember -GroupId $GroupObjectId -All -ErrorAction Stop
         } catch {
             Write-Host "Error getting group members for $GroupObjectId`:`n$_" -ForegroundColor Red
             return $null
@@ -351,7 +351,6 @@ begin {
                             break
                         } else {
                             Write-DetailedExplanationOption -Message "No Group match because $($Email.ToString()) is not a member of Group $($groupObjectId)" -ShowDetailedExplanation:$ShowDetailedExplanation
-                            break
                         }
                     }
                 }
@@ -370,7 +369,6 @@ begin {
                             break
                         } else {
                             Write-DetailedExplanationOption -Message "$($Email.ToString()) is not excluded from rule by membership in Group $($groupObjectId)" -ShowDetailedExplanation:$ShowDetailedExplanation
-                            break
                         }
                     }
                 }
