@@ -24,6 +24,16 @@ function FetchEWSInformation {
     if (-not $Script:WebServicesVirtualDirectory -or -not $Script:WebServicesVirtualDirectoryOAuth) {
         $Script:WebServicesVirtualDirectory = Get-WebServicesVirtualDirectory -Server $Script:Server | Select-Object Identity, Name, ExchangeVersion, *Authentication*, *url -ErrorAction SilentlyContinue
         $Script:WebServicesVirtualDirectoryOAuth = $Script:WebServicesVirtualDirectory
+
+        if ([string]::IsNullOrWhiteSpace($Script:ExchangeOnPremEWS)) {
+            $externalUrl = $Script:WebServicesVirtualDirectory |
+                Where-Object { $null -ne $_.ExternalUrl } |
+                Select-Object -First 1 -ExpandProperty ExternalUrl
+
+            if ($null -ne $externalUrl) {
+                $Script:ExchangeOnPremEWS = $externalUrl.ToString()
+            }
+        }
     }
 }
 function CheckIfExchangeServer {
