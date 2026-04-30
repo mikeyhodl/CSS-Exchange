@@ -4,7 +4,7 @@ function Test-ExchangeOnlineConnection {
     Write-Host -ForegroundColor Green " Checking Exchange Online Configuration"
     Write-Host " Testing Connection to Exchange Online with EO Prefix."
     try {
-        $CheckExoMailbox = Get-EOMailbox $Script:UserOnline -ErrorAction Stop
+        $CheckExoMailbox = get-EOMailbox $Script:UserOnline -ErrorAction Stop
         if ($null -ne $CheckExoMailbox) {
             return $true
         } else {
@@ -24,12 +24,14 @@ function FetchEWSInformation {
     if (-not $Script:WebServicesVirtualDirectory -or -not $Script:WebServicesVirtualDirectoryOAuth) {
         $Script:WebServicesVirtualDirectory = Get-WebServicesVirtualDirectory -Server $Script:Server | Select-Object Identity, Name, ExchangeVersion, *Authentication*, *url -ErrorAction SilentlyContinue
         $Script:WebServicesVirtualDirectoryOAuth = $Script:WebServicesVirtualDirectory
-        $Script:ExchangeOnPremEWS = ($Script:WebServicesVirtualDirectory.externalURL.AbsoluteUri)
     }
 }
 function CheckIfExchangeServer {
-    $exchangeShell = Confirm-ExchangeShell
-    if (-not($exchangeShell.ShellLoaded)) {
+    param (
+        [string]$Server
+    )
+    $exchangeServer = Get-ExchangeServer $Server -ErrorAction SilentlyContinue
+    if (!$exchangeServer) {
         Write-Host "$Server is not an Exchange Server. This script should be run in Exchange Server Management Shell"
         exit
     }
@@ -42,10 +44,10 @@ function CheckParameters {
     if ([string]::IsNullOrWhiteSpace($Script:ExchangeOnPremLocalDomain)) {
         $MissingParameters += "Exchange On Premises Local Domain.  Example: . 'C:\scripts\FreeBusyChecker\FreeBusyChecker.ps1' -OnPremisesUser John@Contoso.com"
     }
-    if ([string]::IsNullOrWhiteSpace($exchangeOnPremDomain)) {
+    if ([string]::IsNullOrWhiteSpace($Script:ExchangeOnPremDomain)) {
         $MissingParameters += "Exchange On Premises Domain.  Example: -OnPremLocalDomain Contoso.local"
     }
-    if ([string]::IsNullOrWhiteSpace($exchangeOnPremEWS)) {
+    if ([string]::IsNullOrWhiteSpace($Script:ExchangeOnPremEWS)) {
         $MissingParameters += "Exchange On Premises EWS Virtual Directory External URL.  Example:  'C:\FreeBusyChecker.ps1' -OnPremEWSUrl https://mail.contoso.com/EWS/Exchange.asmx"
     }
     if ([string]::IsNullOrWhiteSpace($Script:UserOnPrem)) {
