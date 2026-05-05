@@ -129,7 +129,13 @@ function ProcessCalendarSharingAcceptLogs {
         Write-Host "Collecting AcceptCalendarSharingInvite logs for [$Identity] ..."
         $logOutput = Export-MailboxDiagnosticLogs $Identity -ComponentName AcceptCalendarSharingInvite
     } catch {
-        Write-Warning "No AcceptCalendarSharingInvite logs found for [$Identity]."
+        $errorMessage = $_.Exception.Message
+        if ($errorMessage -match "(?i)not\s+found|no\s+logs") {
+            Write-Warning "No AcceptCalendarSharingInvite logs found for [$Identity]. Details: $errorMessage"
+            return
+        }
+
+        throw "Failed to collect AcceptCalendarSharingInvite logs for [$Identity]: $errorMessage"
     }
 
     # check if the output is empty
