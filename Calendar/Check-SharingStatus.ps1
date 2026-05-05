@@ -61,7 +61,8 @@ function ProcessCalendarSharingInviteLogs {
 
         $logOutput = Export-MailboxDiagnosticLogs $Identity -ComponentName CalendarSharingInvite
     } catch {
-        Write-Warning "No CalendarSharingInvite logs found for [$Identity]."
+        Write-Warning "Failed to retrieve CalendarSharingInvite logs for [$Identity]: $($_.Exception.Message)"
+        return
     }
 
     # check if the output is empty
