@@ -34,6 +34,9 @@ function New-IISConfigurationAction {
         $cmdParameters = $Action.Parameters
         Write-Verbose "Provided Action Cmdlet: '$($Action.Cmdlet)' Parameters: '$(Get-ParameterString $cmdParameters)'"
         $setWebConfigPropCmdlet = "Set-WebConfigurationProperty"
+        # EOMT: Added for URL Rewrite rule support - additional cmdlet constants
+        $addWebConfigPropCmdlet = "Add-WebConfigurationProperty"
+        $clearWebConfigCmdlet = "Clear-WebConfiguration"
         $getCurrentValueAction = $null
         $restoreAction = $null
     }
@@ -71,6 +74,94 @@ function New-IISConfigurationAction {
                 Parameters = $currentValueActionParams # Should be the same, then when executing on the server, add the value.
             }
         }
+        # EOMT: Added for URL Rewrite rule support - Add-WebConfigurationProperty handling
+        # When we add a new configuration entry (e.g., a URL Rewrite rule), the restore action
+        # should remove it via Clear-WebConfiguration using the same Filter and PSPath.
+        # The Get action checks if the entry already exists before adding.
+        elseif ($Action.Cmdlet -eq $addWebConfigPropCmdlet) {
+            if (([string]::IsNullOrEmpty($cmdParameters["Filter"])) -or
+                ([string]::IsNullOrEmpty($cmdParameters["PSPath"]))) {
+                throw "Invalid cmdlet parameters provided for $addWebConfigPropCmdlet." +
+                " Expected value for Filter and PSPath. Provided: '$(Get-ParameterString $cmdParameters)'"
+            }
+
+            # EOMT: Build a filter that targets the specific rule being added.
+            # RuleName is required on Add-WebConfigurationProperty actions so the restore action
+            # can target only the specific rule via Clear-WebConfiguration (e.g.,
+            # "system.webServer/rewrite/rules/rule[@name='RuleName']"). Without RuleName, the
+            # Clear filter would fall back to the broad parent filter and remove ALL rewrite rules
+            # on rollback — not just the one that was added. This is a safety check to prevent
+            # CVE definition authors from accidentally creating destructive rollback actions.
+            if ([string]::IsNullOrEmpty($Action.RuleName)) {
+                throw "Add-WebConfigurationProperty actions require a RuleName property to build a targeted rollback filter. " +
+                "Without RuleName, rollback would clear all rules under '$($cmdParameters["Filter"])'. " +
+                "Add a RuleName property to the action object in the CVE definition file."
+            }
+
+            $clearFilter = "{0}/rule[@name='{1}']" -f $cmdParameters["Filter"], $Action.RuleName
+
+            $clearParams = @{
+                Filter      = $clearFilter
+                PSPath      = $cmdParameters["PSPath"]
+                ErrorAction = "Stop"
+            }
+
+            if (-not([string]::IsNullOrEmpty($cmdParameters["Location"]))) {
+                $clearParams.Add("Location", $cmdParameters["Location"])
+            }
+
+            $getCurrentValueAction = [PSCustomObject]@{
+                Cmdlet             = "Get-WebConfiguration"
+                Parameters         = @{
+                    Filter      = $clearFilter
+                    PSPath      = $cmdParameters["PSPath"]
+                    ErrorAction = "SilentlyContinue"
+                }
+                ParametersToString = (Get-ParameterString $clearParams)
+            }
+
+            $restoreAction = [PSCustomObject]@{
+                Cmdlet     = $clearWebConfigCmdlet
+                Parameters = $clearParams
+            }
+        }
+        # EOMT: Added for URL Rewrite rule support - Clear-WebConfiguration handling
+        # When we clear/remove a configuration entry, the restore action should re-add it.
+        # The Get action captures the current value before removal so it can be restored.
+        elseif ($Action.Cmdlet -eq $clearWebConfigCmdlet) {
+            if ([string]::IsNullOrEmpty($cmdParameters["Filter"])) {
+                throw "Invalid cmdlet parameters provided for $clearWebConfigCmdlet." +
+                " Expected value for Filter. Provided: '$(Get-ParameterString $cmdParameters)'"
+            }
+
+            $getParams = @{
+                Filter      = $cmdParameters["Filter"]
+                ErrorAction = "SilentlyContinue"
+            }
+
+            if (-not([string]::IsNullOrEmpty($cmdParameters["PSPath"]))) {
+                $getParams.Add("PSPath", $cmdParameters["PSPath"])
+            }
+
+            if (-not([string]::IsNullOrEmpty($cmdParameters["Location"]))) {
+                $getParams.Add("Location", $cmdParameters["Location"])
+            }
+
+            $getCurrentValueAction = [PSCustomObject]@{
+                Cmdlet             = "Get-WebConfiguration"
+                Parameters         = $getParams
+                ParametersToString = (Get-ParameterString $getParams)
+            }
+
+            # EOMT: For Clear, the restore is an Add that re-creates the removed entry.
+            # The actual value to re-add is captured at execution time by Invoke-IISConfigurationRemoteAction
+            # and stored in the restore JSON file.
+            $restoreAction = [PSCustomObject]@{
+                Cmdlet     = $addWebConfigPropCmdlet
+                Parameters = $getParams
+            }
+        }
+        # EOMT: End of URL Rewrite rule support additions
 
         return [PSCustomObject]@{
             Set     = [PSCustomObject]@{

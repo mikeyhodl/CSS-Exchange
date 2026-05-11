@@ -1,8 +1,8 @@
 ﻿# Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-. $PSScriptRoot\..\IISManagement\New-IISConfigurationAction.ps1
-. $PSScriptRoot\..\IISManagement\Invoke-IISConfigurationManagerAction.ps1
+. $PSScriptRoot\..\..\IISManagement\New-IISConfigurationAction.ps1
+. $PSScriptRoot\..\..\IISManagement\Invoke-IISConfigurationManagerAction.ps1
 
 <#
 .DESCRIPTION

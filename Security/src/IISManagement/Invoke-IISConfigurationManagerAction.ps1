@@ -46,6 +46,15 @@ function Invoke-IISConfigurationManagerAction {
             $managerActionProgressParams.Status = "Working on $($server.ServerName)"
             $managerActionProgressParams.PercentComplete = ($managerActionProgressCounter / $managerActionTotalActions * 100)
             Write-Progress @managerActionProgressParams
+            # TODO: When adding remote server support, this pattern needs review.
+            # ${Function:Invoke-IISConfigurationRemoteAction} captures the function body as a script block
+            # and passes it to Invoke-ScriptBlockHandler for execution. Locally this works in-process.
+            # For remote servers, the script block is serialized via PowerShell remoting — nested functions
+            # (like Write-VerboseAndLog) travel with it since they're defined inside the function body.
+            # The EP management script uses this same pattern for remote execution successfully.
+            # However, any dot-sourced dependencies that Invoke-IISConfigurationRemoteAction relies on
+            # at the top level would NOT be available in the remote session and would need to be
+            # embedded or passed separately.
             $result = Invoke-ScriptBlockHandler -ComputerName $server.ServerName -ArgumentList $server -ScriptBlock ${Function:Invoke-IISConfigurationRemoteAction}
 
             if ($null -eq $result -or
@@ -54,9 +63,16 @@ function Invoke-IISConfigurationManagerAction {
                 $failedServers.Add($server.ServerName)
                 Write-Warning "Failed to execute request on '$($server.ServerName)'. NULL Result: $($null -eq $result)"
 
+                if ($null -ne $result) {
+                    Write-Warning "SuccessfulExecution: $($result.SuccessfulExecution) | AllActionsPerformed: $($result.AllActionsPerformed) | GatheredAllRestoreActions: $($result.GatheredAllRestoreActions) | RestoreActionsSaved: $($result.RestoreActionsSaved) | ErrorCount: $($result.ErrorContext.Count)"
+                }
+
                 if ($result.ErrorContext.Count -gt 0) {
-                    Write-Warning "Error context written out to debug log."
-                    $result.ErrorContext | ForEach-Object { Write-VerboseErrorInformation -CurrentError $_ }
+                    Write-Warning "Error details:"
+                    $result.ErrorContext | ForEach-Object {
+                        Write-Warning "  $_"
+                        Write-VerboseErrorInformation -CurrentError $_
+                    }
                 } else {
                     Write-Verbose "No Error Context provided."
                 }
@@ -80,6 +96,18 @@ function Invoke-IISConfigurationManagerAction {
 
         if ($successfulServers.Count -gt 0) {
             Write-Host "$ConfigurationDescription was successful on the following servers: $([string]::Join(", ", $successfulServers))"
+        }
+
+        # EOMT: Return result so callers can check success/failure.
+        # NOTE: The original IISManagement module does not return a value here.
+        # ExchangeExtendedProtectionManagement relies on console output (Write-Warning/Write-Host)
+        # for success/failure reporting. This return is additive and non-breaking — callers that
+        # don't capture the return value are unaffected. When merging back to the shared module,
+        # this return should be added to benefit EP management as well.
+        return [PSCustomObject]@{
+            FailedServers     = $failedServers
+            SuccessfulServers = $successfulServers
+            AllSucceeded      = ($failedServers.Count -eq 0 -and $successfulServers.Count -gt 0)
         }
     }
 }

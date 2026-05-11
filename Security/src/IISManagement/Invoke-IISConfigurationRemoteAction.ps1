@@ -235,6 +235,7 @@ function Invoke-IISConfigurationRemoteAction {
                             if ($null -ne $loadingJson) {
                                 $parameterNames = $actionItem.Restore.Parameters.Keys | Where-Object { $_ -ne "ErrorAction" -and $_ -ne "Value" }
                                 $matchCmdlet = $loadingJson | Where-Object { $_.Cmdlet -eq $actionItem.Restore.Cmdlet }
+                                $matchFound = $false
 
                                 foreach ($restoreCmdlet in $matchCmdlet) {
                                     $index = 0
@@ -264,10 +265,52 @@ function Invoke-IISConfigurationRemoteAction {
                             } else {
                                 Write-VerboseAndLog "Not adding restore action because it was already in the list."
                             }
-                        } else {
-                            #TODO: need a test case here
-                            throw "NULL Current Value Address Logic"
                         }
+                        # EOMT: Added for URL Rewrite rule support — handle null current value for Add/Clear actions.
+                        # When adding a new rule (Add-WebConfigurationProperty), the Get returns $null because
+                        # the rule doesn't exist yet. The restore action is Clear-WebConfiguration which doesn't
+                        # need a Value parameter — it just needs the Filter to identify what to remove.
+                        # When clearing (Clear-WebConfiguration), a null Get means the item is already gone,
+                        # so no restore action is needed (nothing to re-add).
+                        elseif ($actionItem.Set.Cmdlet -eq "Add-WebConfigurationProperty") {
+                            Write-VerboseAndLog "Current value is null for Add action — rule does not exist yet. Recording Clear restore action without Value."
+
+                            if ($null -ne $loadingJson) {
+                                $parameterNames = $actionItem.Restore.Parameters.Keys | Where-Object { $_ -ne "ErrorAction" }
+                                $matchCmdlet = $loadingJson | Where-Object { $_.Cmdlet -eq $actionItem.Restore.Cmdlet }
+                                $matchFound = $false
+
+                                foreach ($restoreCmdlet in $matchCmdlet) {
+                                    $index = 0
+                                    $matchFound = $true
+
+                                    while ($index -lt $parameterNames.Count) {
+                                        $paramName = $parameterNames[$index]
+
+                                        if ($null -eq $restoreCmdlet.Parameters.$paramName -or
+                                            $restoreCmdlet.Parameters.$paramName -ne $actionItem.Restore.Parameters[$paramName]) {
+                                            $matchFound = $false
+                                            break
+                                        }
+                                        $index++
+                                    }
+                                    if ($matchFound) {
+                                        Write-VerboseAndLog "Found match in existing backup, don't overwrite."
+                                        break
+                                    }
+                                }
+                            }
+
+                            if ($null -eq $loadingJson -or $matchFound -eq $false) {
+                                Write-VerboseAndLog "Adding Clear restore action (no Value parameter needed)."
+                                $restoreActions.Add($actionItem.Restore)
+                            } else {
+                                Write-VerboseAndLog "Not adding restore action because it was already in the list."
+                            }
+                        } else {
+                            Write-VerboseAndLog "Current value is null and action is not an Add — skipping restore action."
+                        }
+                        # EOMT: End of null current-value handling
                     } catch {
                         Write-VerboseAndLog "Failed to collect restore actions."
                         $gatheredAllRestoreActions = $false
@@ -305,7 +348,8 @@ function Invoke-IISConfigurationRemoteAction {
 
             # Proceed to set the configuration
             Write-VerboseAndLog "Setting the configuration actions"
-            foreach ($actionItem in $InputObject.Actions.Set) {
+            foreach ($wrappedAction in $InputObject.Actions) {
+                $actionItem = $wrappedAction.Set
                 try {
                     $commandParameters = $actionItem.Parameters
                     $location = GetLocationValue $commandParameters
