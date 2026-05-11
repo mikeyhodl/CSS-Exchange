@@ -123,8 +123,8 @@ nav:
       - Security/CVE-2023-23397/index.md
       - FAQ: Security/CVE-2023-23397/FAQ.md
     - ConfigureFipFsTextExtractionOverrides: Security/ConfigureFipFsTextExtractionOverrides.md
-    - EOMT: Security/EOMT.md
-    - EOMTv2: Security/EOMTv2.md
+    - EOMT (Legacy): Security/EOMT-Legacy.md
+    - EOMTv2 (Legacy): Security/EOMTv2-Legacy.md
     - Extended Protection: Security/Extended-Protection.md
     - ExchangeExtendedProtectionManagement: Security/ExchangeExtendedProtectionManagement.md
     - ExchangeMitigations: Security/ExchangeMitigations.md
