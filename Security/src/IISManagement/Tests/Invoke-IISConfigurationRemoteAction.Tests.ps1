@@ -61,7 +61,8 @@ BeforeAll {
             [string]$Name,
             [object]$Value,
             [string]$PSPath,
-            [string]$Location
+            [string]$Location,
+            [switch]$WhatIf
         )
     }
 
@@ -134,6 +135,53 @@ BeforeAll {
             BackupFileName = $BackupFileName
             Restore        = $null
             ServerName     = $env:COMPUTERNAME
+        }
+    }
+
+    # Helper: builds an Add action tuple as produced by New-IISConfigurationAction
+    # for Add-WebConfigurationProperty actions. The Get uses Get-WebConfiguration and
+    # the Restore uses Clear-WebConfiguration.
+    function Get-TestAddAction {
+        param(
+            [string]$Filter = "system.webServer/rewrite/rules",
+            [string]$RuleName = "TestAddRule",
+            [string]$PSPath = "IIS:\"
+        )
+        $clearFilter = "{0}/rule[@name='{1}']" -f $Filter, $RuleName
+        $setParams = @{
+            Filter      = $Filter
+            PSPath      = $PSPath
+            Name        = '.'
+            Value       = @{ name = $RuleName; patternSyntax = 'Regular Expressions' }
+            ErrorAction = "Stop"
+            WhatIf      = $false
+        }
+        $getParams = @{
+            Filter      = $clearFilter
+            PSPath      = $PSPath
+            ErrorAction = "SilentlyContinue"
+        }
+        $clearParams = @{
+            Filter      = $clearFilter
+            PSPath      = $PSPath
+            ErrorAction = "Stop"
+        }
+
+        return [PSCustomObject]@{
+            Set     = [PSCustomObject]@{
+                Cmdlet             = "Add-WebConfigurationProperty"
+                Parameters         = $setParams
+                ParametersToString = "mocked"
+            }
+            Get     = [PSCustomObject]@{
+                Cmdlet             = "Get-WebConfiguration"
+                Parameters         = $getParams
+                ParametersToString = "mocked"
+            }
+            Restore = [PSCustomObject]@{
+                Cmdlet     = "Clear-WebConfiguration"
+                Parameters = $clearParams
+            }
         }
     }
 
@@ -556,6 +604,106 @@ Describe "Testing Invoke-IISConfigurationRemoteAction" {
             $result.GatheredAllRestoreActions | Should -Be $true
             $result.SuccessfulExecution | Should -Be $true
             $result.RestoreActions.Count | Should -Be 0
+        }
+    }
+
+    # ========================================================================
+    # NULL CURRENT VALUE HANDLING FOR ADD ACTIONS
+    # When Get returns null for an Add-WebConfigurationProperty action, the
+    # rule doesn't exist yet. The restore action (Clear) is recorded WITHOUT
+    # a Value parameter since Clear just needs the Filter to remove the entry.
+    # ========================================================================
+    Context "Null current value handling for Add-WebConfigurationProperty" {
+
+        It "Should record Clear restore action without Value when Get returns null" {
+            $action = Get-TestAddAction -RuleName "NewRule"
+            $inputObj = Get-TestInputObject -Actions @($action)
+
+            Mock Test-Path { return $false } -ParameterFilter { $Path -like "*.json" }
+            Mock Get-WebConfiguration { return $null }
+            Mock ConvertTo-Json { return '[]' }
+            Mock Add-WebConfigurationProperty { }
+
+            $result = Invoke-IISConfigurationRemoteAction -InputObject $inputObj
+
+            $result.GatheredAllRestoreActions | Should -Be $true
+            $result.SuccessfulExecution | Should -Be $true
+            $result.RestoreActions.Count | Should -Be 1
+            $result.RestoreActions[0].Cmdlet | Should -Be "Clear-WebConfiguration"
+            $result.RestoreActions[0].Parameters.ContainsKey("Value") | Should -Be $false
+        }
+
+        It "Should not duplicate restore action when backup already contains matching entry" {
+            $existingJson = @(
+                [PSCustomObject]@{
+                    Cmdlet     = "Clear-WebConfiguration"
+                    Parameters = [PSCustomObject]@{
+                        Filter      = "system.webServer/rewrite/rules/rule[@name='NewRule']"
+                        PSPath      = "IIS:\"
+                        ErrorAction = "Stop"
+                    }
+                }
+            ) | ConvertTo-Json -Depth 5
+
+            $action = Get-TestAddAction -RuleName "NewRule"
+            $inputObj = Get-TestInputObject -Actions @($action)
+
+            Mock Test-Path { return $true } -ParameterFilter { $Path -like "*.json" }
+            Mock Get-Content { return $existingJson }
+            Mock Get-WebConfiguration { return $null }
+            Mock ConvertTo-Json { return '[]' }
+            Mock Add-WebConfigurationProperty { }
+
+            $result = Invoke-IISConfigurationRemoteAction -InputObject $inputObj
+
+            $result.GatheredAllRestoreActions | Should -Be $true
+            $result.SuccessfulExecution | Should -Be $true
+        }
+    }
+
+    # ========================================================================
+    # NULL GET ACTION HANDLING (sub-collection items without RuleName)
+    # When an Add action has no Get/Restore pair (null), the backup phase
+    # should skip it and continue processing remaining actions.
+    # ========================================================================
+    Context "Null Get action skipped in backup phase" {
+
+        It "Should skip actions with null Get and still succeed" {
+            # Action without Get/Restore (sub-collection item, no RuleName)
+            $noGetAction = [PSCustomObject]@{
+                Set     = [PSCustomObject]@{
+                    Cmdlet             = "Add-WebConfigurationProperty"
+                    Parameters         = @{
+                        Filter      = "system.webServer/rewrite/outboundRules/preConditions/preCondition[@name='test']"
+                        PSPath      = "IIS:\"
+                        Name        = '.'
+                        Value       = @{ input = '{RESPONSE_CONTENT_TYPE}'; pattern = '^text/html' }
+                        ErrorAction = "Stop"
+                        WhatIf      = $false
+                    }
+                    ParametersToString = "mocked"
+                }
+                Get     = $null
+                Restore = $null
+            }
+            # Normal action with Get/Restore
+            $normalAction = Get-TestSetAction -Name "setting1" -Value "val1"
+
+            $inputObj = Get-TestInputObject -Actions @($noGetAction, $normalAction)
+
+            Mock Test-Path { return $false } -ParameterFilter { $Path -like "*.json" }
+            Mock Get-WebConfigurationProperty { return [PSCustomObject]@{ Value = "original" } }
+            Mock ConvertTo-Json { return '[]' }
+            Mock Add-WebConfigurationProperty { }
+            Mock Set-WebConfigurationProperty { }
+
+            $result = Invoke-IISConfigurationRemoteAction -InputObject $inputObj
+
+            $result.GatheredAllRestoreActions | Should -Be $true
+            $result.SuccessfulExecution | Should -Be $true
+            $result.RestoreActions.Count | Should -Be 1
+            Should -Invoke Add-WebConfigurationProperty -Times 1
+            Should -Invoke Set-WebConfigurationProperty -Times 1
         }
     }
 }

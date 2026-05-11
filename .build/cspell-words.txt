@@ -171,3 +171,5 @@ Weve
 wevtutil
 windir
 Xlsb
+onclick
+popout

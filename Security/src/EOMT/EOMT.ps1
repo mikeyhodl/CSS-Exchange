@@ -94,7 +94,7 @@ param(
     [Parameter(Mandatory = $false)]
     [string[]]$SkipExchangeServerNames = $null,
 
-    [ValidateSet("CVE-2021-26855", "CVE-2022-41040")]
+    [ValidateSet("CVE-2021-26855", "CVE-2022-41040", "CVE-2026-42897")]
     [string]$CVE,
 
     [switch]$RollbackMitigation,

@@ -23,19 +23,24 @@
                                       Should throw on unrecoverable errors (e.g., can't
                                       determine Exchange version).
     [ScriptBlock] GetActions      - Returns an array of PSCustomObject action definitions, each with:
-                                        [string]    Cmdlet     - The IIS cmdlet to execute
-                                        [hashtable] Parameters - Parameters to pass to the cmdlet
-                                        [string]    RuleName   - (Required for Add-WebConfigurationProperty)
-                                                                 The URL Rewrite rule name, used to build
-                                                                 targeted Clear-WebConfiguration filter for rollback
+                                        [string]    Cmdlet      - The IIS cmdlet to execute
+                                        [hashtable] Parameters  - Parameters to pass to the cmdlet
+                                        [string]    RuleName    - (Required for Add-WebConfigurationProperty)
+                                                                  The element name, used to build targeted
+                                                                  Clear-WebConfiguration filter for rollback
+                                        [string]    ElementName - (Optional for Add-WebConfigurationProperty)
+                                                                  The IIS collection element type. Defaults to "rule".
+                                                                  Override for other types (e.g., "preCondition").
 #>
 
 . $PSScriptRoot\CVE-2021-26855.ps1
 . $PSScriptRoot\CVE-2022-41040.ps1
+. $PSScriptRoot\CVE-2026-42897.ps1
 
 $script:MitigationDefinitionMap = @{
     "CVE-2021-26855" = { Get-CVE202126855-MitigationDefinition }
     "CVE-2022-41040" = { Get-CVE202241040-MitigationDefinition }
+    "CVE-2026-42897" = { Get-CVE202642897-MitigationDefinition }
 }
 
 <#

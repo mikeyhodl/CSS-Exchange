@@ -217,6 +217,12 @@ function Invoke-IISConfigurationRemoteAction {
                         $remoteActionProgressParams.Status = "Gathering current values. $backupProgressCounter of $backupActionsCount"
                         $remoteActionProgressParams.PercentComplete = ($progressCounter / $totalActions * 100)
                         Write-Progress @remoteActionProgressParams
+
+                        if ($null -eq $actionItem.Get) {
+                            Write-VerboseAndLog "Action has no Get/Restore pair — skipping backup for this action (parent rollback handles cleanup)."
+                            continue
+                        }
+
                         Write-VerboseAndLog "Working on '$($actionItem.Get.Cmdlet) $($actionItem.Get.ParametersToString)"
                         $params = $actionItem.Get.Parameters
                         $currentValue = & $actionItem.Get.Cmdlet @params

@@ -200,4 +200,204 @@ Describe "Testing New-IISConfigurationAction" {
             $result.Restore | Should -BeNullOrEmpty
         }
     }
+
+    # ========================================================================
+    # Add-WebConfigurationProperty tests
+    # ========================================================================
+    Context "Add-WebConfigurationProperty action creates correct Set/Get/Restore tuple" {
+        BeforeAll {
+            $action = [PSCustomObject]@{
+                Cmdlet     = "Add-WebConfigurationProperty"
+                RuleName   = "TestRule"
+                Parameters = @{
+                    Filter = "system.webServer/rewrite/rules"
+                    PSPath = "IIS:\"
+                    Name   = "."
+                    Value  = @{ name = "TestRule"; patternSyntax = "Regular Expressions" }
+                }
+            }
+            $Script:result = New-IISConfigurationAction -Action $action
+        }
+
+        It "Should return a Set action with Add-WebConfigurationProperty cmdlet" {
+            $result.Set.Cmdlet | Should -Be "Add-WebConfigurationProperty"
+        }
+
+        It "Should return a Get action using Get-WebConfiguration" {
+            $result.Get.Cmdlet | Should -Be "Get-WebConfiguration"
+        }
+
+        It "Should return a Restore action using Clear-WebConfiguration" {
+            $result.Restore.Cmdlet | Should -Be "Clear-WebConfiguration"
+        }
+
+        It "Should build a targeted Clear filter with rule[@name] by default" {
+            $result.Restore.Parameters["Filter"] | Should -Be "system.webServer/rewrite/rules/rule[@name='TestRule']"
+        }
+
+        It "Should use the targeted Clear filter in the Get action" {
+            $result.Get.Parameters["Filter"] | Should -Be "system.webServer/rewrite/rules/rule[@name='TestRule']"
+        }
+
+        It "Should set ErrorAction to Stop on the Restore parameters" {
+            $result.Restore.Parameters["ErrorAction"] | Should -Be "Stop"
+        }
+
+        It "Should set ErrorAction to SilentlyContinue on the Get parameters" {
+            $result.Get.Parameters["ErrorAction"] | Should -Be "SilentlyContinue"
+        }
+    }
+
+    Context "Add-WebConfigurationProperty with ElementName overrides default element type" {
+        BeforeAll {
+            $action = [PSCustomObject]@{
+                Cmdlet      = "Add-WebConfigurationProperty"
+                RuleName    = "MyPreCondition"
+                ElementName = "preCondition"
+                Parameters  = @{
+                    Filter = "system.webServer/rewrite/outboundRules/preConditions"
+                    PSPath = "IIS:\"
+                    Name   = "."
+                    Value  = @{ name = "MyPreCondition"; logicalGrouping = "MatchAll" }
+                }
+            }
+            $Script:result = New-IISConfigurationAction -Action $action
+        }
+
+        It "Should build Clear filter using preCondition instead of rule" {
+            $result.Restore.Parameters["Filter"] | Should -Be "system.webServer/rewrite/outboundRules/preConditions/preCondition[@name='MyPreCondition']"
+        }
+
+        It "Should use the same preCondition filter in Get action" {
+            $result.Get.Parameters["Filter"] | Should -Be "system.webServer/rewrite/outboundRules/preConditions/preCondition[@name='MyPreCondition']"
+        }
+    }
+
+    Context "Add-WebConfigurationProperty without RuleName produces null Get/Restore" {
+        It "Should have null Get and Restore when RuleName is not provided" {
+            $action = [PSCustomObject]@{
+                Cmdlet     = "Add-WebConfigurationProperty"
+                Parameters = @{ Filter = "system.webServer/rewrite/rules"; PSPath = "IIS:\"; Name = "." }
+            }
+            $result = New-IISConfigurationAction -Action $action
+            $result.Set.Cmdlet | Should -Be "Add-WebConfigurationProperty"
+            $result.Get | Should -BeNullOrEmpty
+            $result.Restore | Should -BeNullOrEmpty
+        }
+
+        It "Should have null Get and Restore when RuleName is empty string" {
+            $action = [PSCustomObject]@{
+                Cmdlet     = "Add-WebConfigurationProperty"
+                RuleName   = ""
+                Parameters = @{ Filter = "system.webServer/rewrite/rules"; PSPath = "IIS:\"; Name = "." }
+            }
+            $result = New-IISConfigurationAction -Action $action
+            $result.Set.Cmdlet | Should -Be "Add-WebConfigurationProperty"
+            $result.Get | Should -BeNullOrEmpty
+            $result.Restore | Should -BeNullOrEmpty
+        }
+    }
+
+    Context "Validation: Add-WebConfigurationProperty missing Filter or PSPath throws" {
+        It "Should throw when Filter is missing" {
+            $action = [PSCustomObject]@{
+                Cmdlet     = "Add-WebConfigurationProperty"
+                RuleName   = "TestRule"
+                Parameters = @{ PSPath = "IIS:\" }
+            }
+            { New-IISConfigurationAction -Action $action } | Should -Throw "*Invalid cmdlet parameters*Add-WebConfigurationProperty*"
+        }
+
+        It "Should throw when PSPath is missing" {
+            $action = [PSCustomObject]@{
+                Cmdlet     = "Add-WebConfigurationProperty"
+                RuleName   = "TestRule"
+                Parameters = @{ Filter = "system.webServer/rewrite/rules" }
+            }
+            { New-IISConfigurationAction -Action $action } | Should -Throw "*Invalid cmdlet parameters*Add-WebConfigurationProperty*"
+        }
+    }
+
+    Context "Add-WebConfigurationProperty includes Location when provided" {
+        It "Should include Location in Restore and Get parameters" {
+            $action = [PSCustomObject]@{
+                Cmdlet     = "Add-WebConfigurationProperty"
+                RuleName   = "TestRule"
+                Parameters = @{
+                    Filter   = "system.webServer/rewrite/rules"
+                    PSPath   = "IIS:\"
+                    Name     = "."
+                    Location = "Default Web Site"
+                }
+            }
+            $result = New-IISConfigurationAction -Action $action
+            $result.Restore.Parameters["Location"] | Should -Be "Default Web Site"
+            $result.Get.Parameters.ContainsKey("Location") | Should -Be $false
+        }
+    }
+
+    # ========================================================================
+    # Clear-WebConfiguration tests
+    # ========================================================================
+    Context "Clear-WebConfiguration action creates correct Set/Get/Restore tuple" {
+        BeforeAll {
+            $action = [PSCustomObject]@{
+                Cmdlet     = "Clear-WebConfiguration"
+                Parameters = @{
+                    Filter = "system.webServer/rewrite/rules/rule[@name='OldRule']"
+                    PSPath = "IIS:\"
+                }
+            }
+            $Script:result = New-IISConfigurationAction -Action $action
+        }
+
+        It "Should return a Set action with Clear-WebConfiguration cmdlet" {
+            $result.Set.Cmdlet | Should -Be "Clear-WebConfiguration"
+        }
+
+        It "Should return a Get action using Get-WebConfiguration" {
+            $result.Get.Cmdlet | Should -Be "Get-WebConfiguration"
+        }
+
+        It "Should return a Restore action using Add-WebConfigurationProperty" {
+            $result.Restore.Cmdlet | Should -Be "Add-WebConfigurationProperty"
+        }
+
+        It "Should pass Filter through to Get and Restore" {
+            $result.Get.Parameters["Filter"] | Should -Be "system.webServer/rewrite/rules/rule[@name='OldRule']"
+            $result.Restore.Parameters["Filter"] | Should -Be "system.webServer/rewrite/rules/rule[@name='OldRule']"
+        }
+
+        It "Should set ErrorAction to SilentlyContinue on Get parameters" {
+            $result.Get.Parameters["ErrorAction"] | Should -Be "SilentlyContinue"
+        }
+    }
+
+    Context "Validation: Clear-WebConfiguration missing Filter throws" {
+        It "Should throw when Filter is missing" {
+            $action = [PSCustomObject]@{
+                Cmdlet     = "Clear-WebConfiguration"
+                Parameters = @{ PSPath = "IIS:\" }
+            }
+            { New-IISConfigurationAction -Action $action } | Should -Throw "*Invalid cmdlet parameters*Clear-WebConfiguration*"
+        }
+    }
+
+    Context "Clear-WebConfiguration includes Location and PSPath when provided" {
+        It "Should include both in Get and Restore parameters" {
+            $action = [PSCustomObject]@{
+                Cmdlet     = "Clear-WebConfiguration"
+                Parameters = @{
+                    Filter   = "system.webServer/rewrite/rules/rule[@name='R']"
+                    PSPath   = "IIS:\"
+                    Location = "Default Web Site"
+                }
+            }
+            $result = New-IISConfigurationAction -Action $action
+            $result.Get.Parameters["PSPath"] | Should -Be "IIS:\"
+            $result.Get.Parameters["Location"] | Should -Be "Default Web Site"
+            $result.Restore.Parameters["PSPath"] | Should -Be "IIS:\"
+            $result.Restore.Parameters["Location"] | Should -Be "Default Web Site"
+        }
+    }
 }

@@ -85,44 +85,43 @@ function New-IISConfigurationAction {
                 " Expected value for Filter and PSPath. Provided: '$(Get-ParameterString $cmdParameters)'"
             }
 
-            # EOMT: Build a filter that targets the specific rule being added.
-            # RuleName is required on Add-WebConfigurationProperty actions so the restore action
-            # can target only the specific rule via Clear-WebConfiguration (e.g.,
-            # "system.webServer/rewrite/rules/rule[@name='RuleName']"). Without RuleName, the
-            # Clear filter would fall back to the broad parent filter and remove ALL rewrite rules
-            # on rollback — not just the one that was added. This is a safety check to prevent
-            # CVE definition authors from accidentally creating destructive rollback actions.
-            if ([string]::IsNullOrEmpty($Action.RuleName)) {
-                throw "Add-WebConfigurationProperty actions require a RuleName property to build a targeted rollback filter. " +
-                "Without RuleName, rollback would clear all rules under '$($cmdParameters["Filter"])'. " +
-                "Add a RuleName property to the action object in the CVE definition file."
-            }
+            # EOMT: Build a filter that targets the specific element being added.
+            # When RuleName is provided, we build a targeted Clear-WebConfiguration filter for rollback
+            # (e.g., "system.webServer/rewrite/rules/rule[@name='RuleName']").
+            # When RuleName is NOT provided (e.g., sub-collection items like preCondition conditions),
+            # no individual rollback is created — the parent element's rollback handles cleanup.
+            # ElementName defaults to "rule" but can be overridden for other collection types
+            # (e.g., "preCondition" for outbound rule preConditions).
+            if (-not ([string]::IsNullOrEmpty($Action.RuleName))) {
+                $elementName = if ($Action.ElementName) { $Action.ElementName } else { "rule" }
+                $clearFilter = "{0}/{1}[@name='{2}']" -f $cmdParameters["Filter"], $elementName, $Action.RuleName
 
-            $clearFilter = "{0}/rule[@name='{1}']" -f $cmdParameters["Filter"], $Action.RuleName
-
-            $clearParams = @{
-                Filter      = $clearFilter
-                PSPath      = $cmdParameters["PSPath"]
-                ErrorAction = "Stop"
-            }
-
-            if (-not([string]::IsNullOrEmpty($cmdParameters["Location"]))) {
-                $clearParams.Add("Location", $cmdParameters["Location"])
-            }
-
-            $getCurrentValueAction = [PSCustomObject]@{
-                Cmdlet             = "Get-WebConfiguration"
-                Parameters         = @{
+                $clearParams = @{
                     Filter      = $clearFilter
                     PSPath      = $cmdParameters["PSPath"]
-                    ErrorAction = "SilentlyContinue"
+                    ErrorAction = "Stop"
                 }
-                ParametersToString = (Get-ParameterString $clearParams)
-            }
 
-            $restoreAction = [PSCustomObject]@{
-                Cmdlet     = $clearWebConfigCmdlet
-                Parameters = $clearParams
+                if (-not([string]::IsNullOrEmpty($cmdParameters["Location"]))) {
+                    $clearParams.Add("Location", $cmdParameters["Location"])
+                }
+
+                $getCurrentValueAction = [PSCustomObject]@{
+                    Cmdlet             = "Get-WebConfiguration"
+                    Parameters         = @{
+                        Filter      = $clearFilter
+                        PSPath      = $cmdParameters["PSPath"]
+                        ErrorAction = "SilentlyContinue"
+                    }
+                    ParametersToString = (Get-ParameterString $clearParams)
+                }
+
+                $restoreAction = [PSCustomObject]@{
+                    Cmdlet     = $clearWebConfigCmdlet
+                    Parameters = $clearParams
+                }
+            } else {
+                Write-Verbose "Add-WebConfigurationProperty without RuleName — no individual rollback. Parent element rollback handles cleanup."
             }
         }
         # EOMT: Added for URL Rewrite rule support - Clear-WebConfiguration handling
