@@ -1,4 +1,8 @@
-# Exchange On-premises Mitigation Tool v2 (EOMTv2)
+# Exchange On-premises Mitigation Tool v2 (EOMTv2) — Legacy
+
+!!! warning "LEGACY — This script has been replaced"
+
+      This script has been replaced by the unified [Exchange On-premises Mitigation Tool (EOMT)](EOMT.md), which supports multiple CVEs including CVE-2022-41040, JSON-backed rollback, and remote execution. Please use the new EOMT for all current and future mitigations. This page is retained for historical reference only.
 
 !!! warning "Please read carefully"
 
