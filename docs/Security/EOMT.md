@@ -31,10 +31,9 @@ CVE-2021-26855 | ProxyLogon — OWA cookie deserialization SSRF (URL Rewrite mit
 - PowerShell 3 or later
 - Must be run as Administrator
 - IIS 7.5 and later
-- Exchange 2013, 2016, or 2019
-- Windows Server 2008 R2, Server 2012, Server 2012 R2, Server 2016, Server 2019
-- If the Operating System is older than Windows Server 2016, [KB2999226](https://support.microsoft.com/en-us/topic/update-for-universal-c-runtime-in-windows-c0514201-7fe6-95a3-b0a5-287930f3560c) is required for IIS Rewrite Module 2.1
-- [Optional] External Internet connection (required for auto-update, MSERT download, and IIS URL Rewrite Module download)
+- Exchange Server SE (Subscription Edition)
+- Supported Windows Server versions (Server 2019, Server 2022, Server 2025)
+- [Optional] External Internet connection (required for auto-update and MSERT download)
 - [Optional] For remote execution: Exchange Management Shell must be loaded
 
 ## Parameters
@@ -67,7 +66,7 @@ The recommended way to use EOMT. If `-CVE` is not specified, an interactive prom
 ### Apply a specific CVE mitigation
 
 ```powershell
-.\EOMT.ps1 -CVE "CVE-2022-41040"
+.\EOMT.ps1 -CVE "CVE-2026-42897"
 ```
 
 ### Apply mitigation to all Exchange servers
@@ -75,13 +74,13 @@ The recommended way to use EOMT. If `-CVE` is not specified, an interactive prom
 Requires Exchange Management Shell. Servers are checked for vulnerability before mitigations are applied. Servers that are already patched or unreachable are skipped automatically.
 
 ```powershell
-Get-ExchangeServer | .\EOMT.ps1 -CVE "CVE-2022-41040"
+Get-ExchangeServer | .\EOMT.ps1 -CVE "CVE-2026-42897"
 ```
 
 ### Apply mitigation to specific servers
 
 ```powershell
-.\EOMT.ps1 -ExchangeServerNames "EX01", "EX02" -CVE "CVE-2021-26855"
+.\EOMT.ps1 -ExchangeServerNames "EX01", "EX02" -CVE "CVE-2026-42897"
 ```
 
 ### Roll back a mitigation
@@ -89,13 +88,13 @@ Get-ExchangeServer | .\EOMT.ps1 -CVE "CVE-2022-41040"
 Restores the original IIS configuration from the JSON backup file created during apply.
 
 ```powershell
-.\EOMT.ps1 -RollbackMitigation -CVE "CVE-2022-41040"
+.\EOMT.ps1 -RollbackMitigation -CVE "CVE-2026-42897"
 ```
 
 ### Roll back on all Exchange servers
 
 ```powershell
-Get-ExchangeServer | .\EOMT.ps1 -RollbackMitigation -CVE "CVE-2022-41040"
+Get-ExchangeServer | .\EOMT.ps1 -RollbackMitigation -CVE "CVE-2026-42897"
 ```
 
 ### Check vulnerability status
@@ -103,7 +102,7 @@ Get-ExchangeServer | .\EOMT.ps1 -RollbackMitigation -CVE "CVE-2022-41040"
 Checks each target server's Exchange build/patch level to determine if the security fix is missing. No changes are made.
 
 ```powershell
-.\EOMT.ps1 -ShowMitigationStatus -CVE "CVE-2021-26855"
+.\EOMT.ps1 -ShowMitigationStatus -CVE "CVE-2026-42897"
 ```
 
 ### Run MSERT scan only (no mitigation)
@@ -121,13 +120,13 @@ Checks each target server's Exchange build/patch level to determine if the secur
 ### Preview changes with WhatIf
 
 ```powershell
-.\EOMT.ps1 -WhatIf -CVE "CVE-2022-41040"
+.\EOMT.ps1 -WhatIf -CVE "CVE-2026-42897"
 ```
 
 ### Skip specific servers during remote execution
 
 ```powershell
-Get-ExchangeServer | .\EOMT.ps1 -CVE "CVE-2022-41040" -SkipExchangeServerNames "EX03"
+Get-ExchangeServer | .\EOMT.ps1 -CVE "CVE-2026-42897" -SkipExchangeServerNames "EX03"
 ```
 
 ## How It Works

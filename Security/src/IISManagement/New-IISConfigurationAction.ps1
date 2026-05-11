@@ -41,7 +41,6 @@ function New-IISConfigurationAction {
         $restoreAction = $null
     }
     process {
-        #TODO: Validate the Action.Parameters Pester Testing.
         # Validate the Action to make sure it passes prior to trying to execute.
         if ($Action.Cmdlet -eq $setWebConfigPropCmdlet) {
             # Set-WebConfigurationProperty requires Filter, Name, and Value.

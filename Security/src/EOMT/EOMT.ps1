@@ -53,29 +53,29 @@
         Applies the default (highest priority) CVE mitigation to the local server.
         If -CVE is not specified, an interactive prompt allows selection.
     .EXAMPLE
-        PS C:\> .\EOMT.ps1 -CVE "CVE-2022-41040"
-        Applies the CVE-2022-41040 mitigation to the local server.
+        PS C:\> .\EOMT.ps1 -CVE "CVE-2026-42897"
+        Applies the CVE-2026-42897 mitigation to the local server.
     .EXAMPLE
-        PS C:\> Get-ExchangeServer | .\EOMT.ps1 -CVE "CVE-2021-26855"
-        Applies the CVE-2021-26855 mitigation to all Exchange servers in the organization
+        PS C:\> Get-ExchangeServer | .\EOMT.ps1 -CVE "CVE-2026-42897"
+        Applies the CVE-2026-42897 mitigation to all Exchange servers in the organization
         via pipeline input from Exchange Management Shell.
     .EXAMPLE
-        PS C:\> .\EOMT.ps1 -ExchangeServerNames "EX01", "EX02" -CVE "CVE-2022-41040"
-        Applies the CVE-2022-41040 mitigation to specific servers by name.
+        PS C:\> .\EOMT.ps1 -ExchangeServerNames "EX01", "EX02" -CVE "CVE-2026-42897"
+        Applies the CVE-2026-42897 mitigation to specific servers by name.
     .EXAMPLE
-        PS C:\> .\EOMT.ps1 -RollbackMitigation -CVE "CVE-2022-41040"
-        Rolls back the CVE-2022-41040 mitigation on the local server using the JSON backup.
+        PS C:\> .\EOMT.ps1 -RollbackMitigation -CVE "CVE-2026-42897"
+        Rolls back the CVE-2026-42897 mitigation on the local server using the JSON backup.
     .EXAMPLE
-        PS C:\> Get-ExchangeServer | .\EOMT.ps1 -RollbackMitigation -CVE "CVE-2021-26855"
-        Rolls back the CVE-2021-26855 mitigation on all Exchange servers.
+        PS C:\> Get-ExchangeServer | .\EOMT.ps1 -RollbackMitigation -CVE "CVE-2026-42897"
+        Rolls back the CVE-2026-42897 mitigation on all Exchange servers.
     .EXAMPLE
-        PS C:\> .\EOMT.ps1 -ShowMitigationStatus -CVE "CVE-2021-26855"
-        Displays whether each target server is missing the security fix for CVE-2021-26855.
+        PS C:\> .\EOMT.ps1 -ShowMitigationStatus -CVE "CVE-2026-42897"
+        Displays whether each target server is missing the security fix for CVE-2026-42897.
     .EXAMPLE
         PS C:\> .\EOMT.ps1 -RunMSERT -DoNotRunMitigation
         Runs the Microsoft Safety Scanner without applying any IIS mitigation.
     .EXAMPLE
-        PS C:\> .\EOMT.ps1 -WhatIf -CVE "CVE-2022-41040"
+        PS C:\> .\EOMT.ps1 -WhatIf -CVE "CVE-2026-42897"
         Shows what IIS configuration changes would be made without applying them.
     .LINK
         https://microsoft.github.io/CSS-Exchange/Security/EOMT/
@@ -223,7 +223,7 @@ begin {
         if ($serversToProcess.Count -eq 0) {
             # Local-only mode: verify Exchange is installed on this machine
             if (-not ((Get-ItemProperty -Path Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\ExchangeServer\v15\Setup -ErrorAction 0).MsiInstallPath)) {
-                Write-Error "A supported version of Exchange was not found on $env:COMPUTERNAME. EOMT supports Exchange 2013, 2016, and 2019."
+                Write-Error "A supported version of Exchange was not found on $env:COMPUTERNAME. EOMT supports Exchange Server SE."
                 exit
             }
             $serversToProcess.Add($env:COMPUTERNAME)
@@ -436,6 +436,9 @@ begin {
                     Write-Host "Mitigation for $resolvedCVE applied on $server" -ForegroundColor Green
                 } else {
                     Write-Warning "Mitigation for $resolvedCVE failed on $server. Please review the log at $EOMTLogFile"
+                    if ($isRemoteExecution) {
+                        Write-Warning "For remote server details, check the IIS management debug log on $server at: %WINDIR%\System32\inetsrv\config\IISManagementDebugLog.txt"
+                    }
                     if ($null -ne $applyResult.Result -and $applyResult.Result.FailedServers.Count -gt 0) {
                         Write-Host "Failed servers: $($applyResult.Result.FailedServers -join ', ')"
                     }

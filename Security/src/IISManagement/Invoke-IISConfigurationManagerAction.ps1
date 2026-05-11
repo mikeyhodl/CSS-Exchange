@@ -46,13 +46,11 @@ function Invoke-IISConfigurationManagerAction {
             $managerActionProgressParams.Status = "Working on $($server.ServerName)"
             $managerActionProgressParams.PercentComplete = ($managerActionProgressCounter / $managerActionTotalActions * 100)
             Write-Progress @managerActionProgressParams
-            # TODO: When adding remote server support, this pattern needs review.
             # ${Function:Invoke-IISConfigurationRemoteAction} captures the function body as a script block
             # and passes it to Invoke-ScriptBlockHandler for execution. Locally this works in-process.
             # For remote servers, the script block is serialized via PowerShell remoting — nested functions
             # (like Write-VerboseAndLog) travel with it since they're defined inside the function body.
-            # The EP management script uses this same pattern for remote execution successfully.
-            # However, any dot-sourced dependencies that Invoke-IISConfigurationRemoteAction relies on
+            # Any dot-sourced dependencies that Invoke-IISConfigurationRemoteAction relies on
             # at the top level would NOT be available in the remote session and would need to be
             # embedded or passed separately.
             $result = Invoke-ScriptBlockHandler -ComputerName $server.ServerName -ArgumentList $server -ScriptBlock ${Function:Invoke-IISConfigurationRemoteAction}

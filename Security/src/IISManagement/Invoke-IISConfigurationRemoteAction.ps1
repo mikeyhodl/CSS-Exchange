@@ -227,7 +227,6 @@ function Invoke-IISConfigurationRemoteAction {
                         $params = $actionItem.Get.Parameters
                         $currentValue = & $actionItem.Get.Cmdlet @params
 
-                        #TODO: Need to determine if this is the correct course of logic when not dealing with a true value or a Set-WebConfigProp
                         if ($null -ne $currentValue) {
 
                             # Some values will return a complete object. Only pull out the value.
