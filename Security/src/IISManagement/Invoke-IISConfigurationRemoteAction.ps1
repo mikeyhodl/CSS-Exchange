@@ -165,7 +165,8 @@ function Invoke-IISConfigurationRemoteAction {
                         $commandParameters = $cmd.Parameters
                         $location = GetLocationValue $commandParameters
                         $progressCounter++
-                        $remoteActionProgressParams.Status = "Restoring settings $($commandParameters["Name"]) at '$location'"
+                        $actionDisplay = if ($commandParameters.ContainsKey("Name")) { $commandParameters["Name"] } else { $commandParameters["Filter"] }
+                        $remoteActionProgressParams.Status = "Restoring settings $actionDisplay at '$location'"
                         $remoteActionProgressParams.PercentComplete = ($progressCounter / $totalActions * 100)
                         Write-Progress @remoteActionProgressParams
 
@@ -223,7 +224,7 @@ function Invoke-IISConfigurationRemoteAction {
                             continue
                         }
 
-                        Write-VerboseAndLog "Working on '$($actionItem.Get.Cmdlet) $($actionItem.Get.ParametersToString)"
+                        Write-VerboseAndLog "Working on '$($actionItem.Get.Cmdlet) $($actionItem.Get.ParametersToString)'"
                         $params = $actionItem.Get.Parameters
                         $currentValue = & $actionItem.Get.Cmdlet @params
 
@@ -358,15 +359,16 @@ function Invoke-IISConfigurationRemoteAction {
                 try {
                     $commandParameters = $actionItem.Parameters
                     $location = GetLocationValue $commandParameters
+                    $actionDisplay = if ($commandParameters.ContainsKey("Name")) { $commandParameters["Name"] } else { $commandParameters["Filter"] }
                     $progressCounter++
-                    $remoteActionProgressParams.Status = "Setting $($commandParameters["Name"]) at '$location'"
+                    $remoteActionProgressParams.Status = "Setting $actionDisplay at '$location'"
                     $remoteActionProgressParams.PercentComplete = ($progressCounter / $totalActions * 100)
                     Write-Progress @remoteActionProgressParams
                     Write-VerboseAndLog "Running the following: $($actionItem.Cmdlet) $($actionItem.ParametersToString)"
 
                     & $actionItem.Cmdlet @commandParameters
                 } catch {
-                    Write-VerboseAndLog "$($env:COMPUTERNAME): Failed to set '$($commandParameters["Name"])' for '$location' with the value '$($commandParameters["Value"])'. Inner Exception $_"
+                    Write-VerboseAndLog "$($env:COMPUTERNAME): Failed to execute '$($actionItem.Cmdlet)' for '$actionDisplay' at '$location'. Inner Exception $_"
                     $allActionsPerformed = $false
                     $errorContext.Add($_)
                 }

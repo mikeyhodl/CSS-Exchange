@@ -332,7 +332,7 @@ Describe "Testing New-IISConfigurationAction" {
             }
             $result = New-IISConfigurationAction -Action $action
             $result.Restore.Parameters["Location"] | Should -Be "Default Web Site"
-            $result.Get.Parameters.ContainsKey("Location") | Should -Be $false
+            $result.Get.Parameters["Location"] | Should -Be "Default Web Site"
         }
     }
 

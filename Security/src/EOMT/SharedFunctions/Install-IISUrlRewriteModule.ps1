@@ -64,7 +64,7 @@ function Install-IISUrlRewriteModule {
                 "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
             )
 
-            New-PSDrive -Name HKU -PSProvider Registry -Root Registry::HKEY_USERS | Out-Null
+            New-PSDrive -Name HKU -PSProvider Registry -Root Registry::HKEY_USERS -ErrorAction SilentlyContinue | Out-Null
 
             $UninstallKeys += Get-ChildItem HKU: | Where-Object { $_.Name -match 'S-\d-\d+-(\d+-){1,14}\d+$' } | ForEach-Object {
                 "HKU:\$($_.PSChildName)\Software\Microsoft\Windows\CurrentVersion\Uninstall"
@@ -160,7 +160,7 @@ function Install-IISUrlRewriteModule {
 
     $msiProductVersion = Get-MsiProductVersion -filename $downloadPath
 
-    if ($msiProductVersion -lt "7.2.1993") {
+    if ([version]$msiProductVersion -lt [version]"7.2.1993") {
         Write-Warning "Incorrect IIS URL Rewrite Module downloaded on $env:COMPUTERNAME"
         throw "Incorrect IIS URL Rewrite Module downloaded"
     }

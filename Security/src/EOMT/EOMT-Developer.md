@@ -35,7 +35,7 @@ Security/src/EOMT/
 │   ├── Invoke-ApplyMitigations.ps1    # Wraps CVE actions and sends to IIS pipeline
 │   └── Invoke-RollbackMitigations.ps1 # Restores original config from JSON backup
 ├── DataCollection/
-│   └── Get-VulnerabilityStatus.ps1    # Runs TestVulnerable for a CVE; returns MitigationApplied and CodeFixApplied
+│   └── Get-VulnerabilityStatus.ps1    # Runs TestVulnerable for a CVE; returns MitigationApplied, CodeFixApplied, DisabledRules, and RuleNameMatch
 ├── Mitigations/
 │   ├── MitigationDefinitions.ps1      # CVE registry — dot-sources all CVE files
 │   ├── CVE-2021-26855.ps1             # ProxyLogon
@@ -119,8 +119,9 @@ function Get-CVE20XX99999-MitigationDefinition {
         RequiresUrlRewrite     = $true
         SiteName               = "Default Web Site"
         TestVulnerable = {
-            # Returns a hashtable with MitigationApplied (bool) and CodeFixApplied (bool).
-            # Must work over PS remoting — no module dependencies!
+            # Returns a hashtable with MitigationApplied (bool), CodeFixApplied (bool),
+                # DisabledRules (array), and RuleNameMatch (bool).
+                # Must work over PS remoting — no module dependencies!
         }
         GetActions             = {
             # Returns an array of action objects for the IIS pipeline.
@@ -138,7 +139,7 @@ function Get-CVE20XX99999-MitigationDefinition {
 | `Description` | `string` | Human-readable description shown in prompts and logs. |
 | `RequiresUrlRewrite` | `bool` | Set to `$true` if the mitigation needs the IIS URL Rewrite Module. The framework will auto-install it if missing. |
 | `SiteName` | `string` | The IIS site name, e.g., `"Default Web Site"`. Used in prerequisite checks. |
-| `TestVulnerable` | `ScriptBlock` | Returns a `@{ MitigationApplied = [bool]; CodeFixApplied = [bool] }` hashtable. `MitigationApplied` indicates whether IIS mitigation rules are present. `CodeFixApplied` indicates whether the Exchange security update is installed. Should `throw` on unrecoverable errors. See [Important Constraints](#testvulnerable-constraints) below. |
+| `TestVulnerable` | `ScriptBlock` | Returns a `@{ MitigationApplied = [bool]; CodeFixApplied = [bool]; DisabledRules = [array]; RuleNameMatch = [bool] }` hashtable. `MitigationApplied` is `$true` only when a rule exists **and** is enabled. `CodeFixApplied` indicates whether the Exchange security update is installed. `DisabledRules` is an array of `@{ Filter; PSPath }` objects for rules that match the expected behavior but are disabled; empty array (`@()`) when none. `RuleNameMatch` is `$true` when our expected rule name exists but its behavior doesn't match (name conflict). Should `throw` on unrecoverable errors. See [Important Constraints](#testvulnerable-constraints) below. |
 | `GetActions` | `ScriptBlock` | Returns an `array` of `[PSCustomObject]` action definitions for the IIS management pipeline. |
 
 #### TestVulnerable Constraints
@@ -146,10 +147,11 @@ function Get-CVE20XX99999-MitigationDefinition {
 This ScriptBlock runs on the target server via PowerShell remoting. It is passed as a string
 and recreated with `[ScriptBlock]::Create()`. This means:
 
-- ❌ **No module-dependent cmdlets** (e.g., no `Get-ExchangeServer`, no `Get-WebConfiguration`)
-- ✅ **Use only built-in commands** (`Get-Command`, `Get-ItemProperty`, registry reads, etc.)
+- ❌ **No Exchange Management Shell cmdlets** (e.g., no `Get-ExchangeServer` — EMS may not be loaded on the remote side)
+- ✅ **IIS cmdlets are allowed** (`Get-WebConfiguration`, `Get-WebConfigurationProperty` — the WebAdministration module is always available on Exchange servers)
+- ✅ **Use built-in commands** (`Get-Command`, `Get-ItemProperty`, registry reads, etc.)
 - ✅ **Throw on failure** — the framework catches exceptions and reports them
-- ✅ **Return a hashtable** with `MitigationApplied` and `CodeFixApplied` boolean properties
+- ✅ **Return a hashtable** with `MitigationApplied` (bool), `CodeFixApplied` (bool), `DisabledRules` (array of `@{ Filter; PSPath }`), and `RuleNameMatch` (bool)
 
 **Example** — version check via `ExSetup.exe` with mitigation detection:
 
@@ -189,7 +191,12 @@ TestVulnerable = {
     # (detection logic varies per CVE — see CVE-2026-42897 for advanced example)
     $mitigationApplied = $false  # Placeholder — check for IIS URL Rewrite rule
 
-    return @{ MitigationApplied = $mitigationApplied; CodeFixApplied = $codeFixApplied }
+    return @{
+        MitigationApplied = $mitigationApplied
+        CodeFixApplied    = $codeFixApplied
+        DisabledRules     = @()
+        RuleNameMatch     = $false
+    }
 }
 ```
 
@@ -423,6 +430,19 @@ GetActions = {
 > by inspecting outbound rule properties (such as `serverVariable`, action type, and action
 > value) and verifying preCondition conditions using `GetCollection()` with indexer access.
 > This ensures the mitigation is detected even if rule names have been customized.
+>
+> **Enabled check:** A rule is only considered "applied" if its `enabled` property is `$true`.
+> Disabled rules that match the expected behavior are collected in the `DisabledRules` array
+> (each entry contains `Filter` and `PSPath` for identification).
+>
+> **Name conflict detection:** The ScriptBlock maintains `$expectedRuleNames` and
+> `$expectedPreConditionNames` lists. If a rule with the expected name exists but its behavior
+> does not match (e.g., the name was reused for a different purpose), `RuleNameMatch` is set
+> to `$true`. This prevents EOMT from blindly overwriting a user-customized rule.
+>
+> **Verbose logging:** Every rule evaluated is logged via `Write-Verbose`, showing its name,
+> enabled state, and whether its behavior matched. This aids troubleshooting when rules are
+> not detected as expected.
 
 ### Step 3: Register the Definition
 
@@ -534,11 +554,15 @@ All real work happens here, after all pipeline input is collected.
      ┌────────────────────┐
      │ -ShowMitigationStatus? ──Yes──► Run TestVulnerable on each server
      │                    │           via Invoke-ScriptBlockHandler.
-     │                    │           Display Code Fix and Mitigation status:
-     │                    │             CodeFix ✓ + Mitigation ✗ → "N/A (protected)" Green
-     │                    │             CodeFix ✓ + Mitigation ✓ → "Can roll back" Yellow
-     │                    │             CodeFix ✗ + Mitigation ✓ → Green
-     │                    │             CodeFix ✗ + Mitigation ✗ → "ACTION REQUIRED" Red
+     │                    │           Display Code Fix and Mitigation status (6 states):
+     │                    │             CodeFix ✓ + Mitigation ✓ → "True (can be safely rolled back)" Yellow
+     │                    │             CodeFix ✓ + Mitigation ✗ → "N/A (protected by security update)" Green
+     │                    │             CodeFix ✗ + Mitigation ✓ → "True" Green
+     │                    │             CodeFix ✗ + RuleNameMatch → "CONFLICT — rollback then re-apply" Red
+     │                    │             CodeFix ✗ + DisabledRules → "DISABLED — rollback then re-apply" Red
+     │                    │                                          or "False — matching rule disabled
+     │                    │                                          under different name. Run EOMT to apply." Red
+     │                    │             CodeFix ✗ + Nothing       → "False — ACTION REQUIRED" Red
      │                    │           Report and exit.
      └────────┬───────────┘
               │ No
@@ -550,8 +574,13 @@ All real work happens here, after all pipeline input is collected.
               ▼
      ┌────────────────────────────────────────────────────────────┐
      │ Per-server prerequisite check (remote Call 1):             │
-     │   • Run TestVulnerable → {MitigationApplied, CodeFixApplied}│
+     │   • Run TestVulnerable → {MitigationApplied, CodeFixApplied,│
+     │     DisabledRules, RuleNameMatch}                           │
      │   • Skip server if CodeFixApplied or MitigationApplied     │
+     │   • If RuleNameMatch = $true → block apply, warn to        │
+     │     rollback first then re-apply (name conflict)            │
+     │   • If DisabledRules > 0 with no RuleNameMatch → proceed   │
+     │     to apply (different name, no conflict)                  │
      │   • Is URL Rewrite installed? (if RequiresUrlRewrite)      │
      │   Skip server if protected or missing URL Rewrite          │
      └────────┬───────────────────────────────────────────────────┘
@@ -585,7 +614,7 @@ $testString = $MitigationDefinition.TestVulnerable.ToString()
 # On the remote side, recreate the ScriptBlock:
 $testScript = [ScriptBlock]::Create($testString)
 $status = & $testScript
-# $status is a hashtable: @{ MitigationApplied = $bool; CodeFixApplied = $bool }
+# $status is a hashtable: @{ MitigationApplied = $bool; CodeFixApplied = $bool; DisabledRules = @(); RuleNameMatch = $bool }
 ```
 
 ---
@@ -758,7 +787,11 @@ naturally with Exchange Management Shell workflows.
 
 ## 7. Common Pitfalls
 
-### Don't Use Module-Dependent Cmdlets in TestVulnerable
+### Don't Use Exchange Management Shell Cmdlets in TestVulnerable
+
+IIS cmdlets (`Get-WebConfiguration`, `Get-WebConfigurationProperty`) are allowed because the
+WebAdministration module is always available on Exchange servers. However, Exchange Management
+Shell cmdlets require the EMS snapin which may not be loaded in the remote session.
 
 ```powershell
 # ❌ WRONG — Get-ExchangeServer requires the Exchange Management Shell snapin
@@ -767,12 +800,18 @@ TestVulnerable = {
     return @{ MitigationApplied = $false; CodeFixApplied = ($server.AdminDisplayVersion -ge "15.2.1118.20") }
 }
 
-# ✅ CORRECT — Use built-in commands that are always available
+# ✅ CORRECT — Use built-in commands and IIS cmdlets
 TestVulnerable = {
     $info = Get-Command ExSetup.exe -ErrorAction Stop | ForEach-Object { $_.FileVersionInfo }
     $codeFixApplied = ([System.Version]$info.FileVersion -ge "15.02.1118.020")
-    $mitigationApplied = $false  # Check for IIS URL Rewrite rule presence
-    return @{ MitigationApplied = $mitigationApplied; CodeFixApplied = $codeFixApplied }
+    $rule = Get-WebConfiguration -Filter "system.webServer/rewrite/rules/rule[@name='MyRule']" -PSPath "IIS:\" -ErrorAction SilentlyContinue
+    $mitigationApplied = ($null -ne $rule -and $rule.enabled -ne $false)
+    return @{
+        MitigationApplied = $mitigationApplied
+        CodeFixApplied    = $codeFixApplied
+        DisabledRules     = @()
+        RuleNameMatch     = $false
+    }
 }
 ```
 
@@ -865,6 +904,25 @@ These tests cover:
 - `RuleName` and `ElementName` handling
 - Backup JSON creation and restore execution
 - Error handling and failure paths
+- Server iteration and mixed success/failure scenarios
+- Parameter string formatting
+
+### CVE-Specific TestVulnerable Tests
+
+Each new CVE definition should have a corresponding Pester test file at
+`Security/src/EOMT/Mitigations/Tests/CVE-YYYY-NNNNN.Tests.ps1`. Use
+`CVE-2026-42897.Tests.ps1` as a template. At minimum, include tests for:
+
+| Category | Test cases |
+|----------|-----------|
+| Mitigation detection | Full match (enabled), different name still matches, wrong behavior does not match, missing preCondition does not match |
+| Disabled rule detection | Disabled + our name → `RuleNameMatch = $true`, disabled + different name → `RuleNameMatch = $false` |
+| RuleNameMatch detection | Our name with wrong behavior → `RuleNameMatch = $true`, different name with wrong behavior → `RuleNameMatch = $false` |
+| Code fix detection | At threshold, above threshold, below threshold |
+
+Mock IIS cmdlets with stub functions (`Get-WebConfiguration`) and use helper functions
+to build mock rule/preCondition objects with `enabled`, `match`, `action`, and
+`GetCollection()` support.
 - Server iteration and mixed success/failure scenarios
 - Parameter string formatting
 

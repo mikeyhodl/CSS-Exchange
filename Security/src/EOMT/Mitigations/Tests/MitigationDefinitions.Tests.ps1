@@ -207,4 +207,43 @@ Describe "Testing MitigationDefinitions" {
             }
         }
     }
+
+    Context "TestVulnerable expected names consistency with GetActions" {
+
+        It "Definitions with expectedRuleNames must match GetActions rule-type Add RuleNames" {
+            foreach ($key in $script:MitigationDefinitionMap.Keys) {
+                $def = & $script:MitigationDefinitionMap[$key]
+                $scriptText = $def.TestVulnerable.ToString()
+                $match = [regex]::Match($scriptText, '\$expectedRuleNames\s*=\s*@\(([^)]+)\)')
+
+                if (-not $match.Success) { continue }
+
+                $parsed = $match.Groups[1].Value -split "," | ForEach-Object { $_.Trim().Trim("'").Trim('"') } | Where-Object { $_ }
+                $parsedNames = @($parsed) | Sort-Object
+
+                $actions = @(& $def.GetActions) | Where-Object { $_.Cmdlet -eq "Add-WebConfigurationProperty" -and $_.RuleName -and -not $_.ElementName }
+                $getActionsRuleNames = @($actions | ForEach-Object { $_.RuleName }) | Sort-Object
+
+                $parsedNames | Should -Be $getActionsRuleNames -Because "$key expectedRuleNames must match GetActions rule-type RuleNames"
+            }
+        }
+
+        It "Definitions with expectedPreConditionNames must match GetActions preCondition-type Add RuleNames" {
+            foreach ($key in $script:MitigationDefinitionMap.Keys) {
+                $def = & $script:MitigationDefinitionMap[$key]
+                $scriptText = $def.TestVulnerable.ToString()
+                $match = [regex]::Match($scriptText, '\$expectedPreConditionNames\s*=\s*@\(([^)]+)\)')
+
+                if (-not $match.Success) { continue }
+
+                $parsed = $match.Groups[1].Value -split "," | ForEach-Object { $_.Trim().Trim("'").Trim('"') } | Where-Object { $_ }
+                $parsedNames = @($parsed) | Sort-Object
+
+                $actions = @(& $def.GetActions) | Where-Object { $_.Cmdlet -eq "Add-WebConfigurationProperty" -and $_.RuleName -and $_.ElementName -eq "preCondition" }
+                $getActionsPreConditionNames = @($actions | ForEach-Object { $_.RuleName }) | Sort-Object
+
+                $parsedNames | Should -Be $getActionsPreConditionNames -Because "$key expectedPreConditionNames must match GetActions preCondition-type RuleNames"
+            }
+        }
+    }
 }

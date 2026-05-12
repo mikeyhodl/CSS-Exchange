@@ -291,6 +291,16 @@ begin {
                         Write-Host -NoNewline " | Mitigation Applied: "
                         if ($statusResult.MitigationApplied) {
                             Write-Host "$($statusResult.MitigationApplied)" -ForegroundColor Green
+                        } elseif ($statusResult.RuleNameMatch) {
+                            if ($statusResult.DisabledRules.Count -gt 0) {
+                                Write-Host -NoNewline "DISABLED" -ForegroundColor Red
+                            } else {
+                                Write-Host -NoNewline "CONFLICT" -ForegroundColor Red
+                            }
+                            Write-Host " — rollback then re-apply" -ForegroundColor Red
+                        } elseif ($statusResult.DisabledRules.Count -gt 0) {
+                            Write-Host -NoNewline "False" -ForegroundColor Red
+                            Write-Host " — a matching rule exists but is disabled under a different name. Run EOMT to apply." -ForegroundColor Red
                         } else {
                             Write-Host -NoNewline "$($statusResult.MitigationApplied)" -ForegroundColor Red
                             Write-Host " — ACTION REQUIRED" -ForegroundColor Red
@@ -339,6 +349,8 @@ begin {
             $result = @{
                 CodeFixApplied      = $false
                 MitigationApplied   = $false
+                DisabledRules       = @()
+                RuleNameMatch       = $false
                 UrlRewriteInstalled = $true
                 ErrorContext        = $null
             }
@@ -348,6 +360,8 @@ begin {
                 $vulnResult = & $testVulnerable
                 $result.CodeFixApplied = [bool]$vulnResult.CodeFixApplied
                 $result.MitigationApplied = [bool]$vulnResult.MitigationApplied
+                $result.DisabledRules = @($vulnResult.DisabledRules)
+                $result.RuleNameMatch = [bool]$vulnResult.RuleNameMatch
             } catch {
                 $result.ErrorContext = "Unable to determine vulnerability status: $_"
                 return $result
@@ -355,7 +369,11 @@ begin {
 
             if ($CheckUrlRewrite) {
                 try {
-                    $rewriteModule = Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue |
+                    $uninstallPaths = @(
+                        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+                        "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+                    )
+                    $rewriteModule = Get-ItemProperty $uninstallPaths -ErrorAction SilentlyContinue |
                         Where-Object { $_.DisplayName -like "*IIS*" -and $_.DisplayName -like "*URL*" -and $_.DisplayName -like "*2*" }
                     $result.UrlRewriteInstalled = ($null -ne $rewriteModule)
                 } catch {
@@ -372,6 +390,7 @@ begin {
         $notVulnerableServers = New-Object System.Collections.Generic.List[string]
         $unreachableServers = New-Object System.Collections.Generic.List[string]
         $missingUrlRewrite = New-Object System.Collections.Generic.List[string]
+        $conflictServers = New-Object System.Collections.Generic.List[string]
 
         if (-not $RollbackMitigation -and -not $DoNotRunMitigation) {
             $serverCount = 0
@@ -407,6 +426,17 @@ begin {
                     continue
                 }
 
+                if ($prerequisiteResult.RuleNameMatch) {
+                    if ($prerequisiteResult.DisabledRules.Count -gt 0) {
+                        Write-Warning "$server : Mitigation rules for $resolvedCVE are DISABLED."
+                    } else {
+                        Write-Warning "$server : A rule with the expected name exists but does not match the current mitigation configuration for $resolvedCVE."
+                    }
+                    Write-Warning "$server : Run '.\EOMT.ps1 -RollbackMitigation -CVE $resolvedCVE' first, then re-run EOMT to apply the updated mitigation."
+                    $conflictServers.Add($server)
+                    continue
+                }
+
                 if ($mitigationDefinition.RequiresUrlRewrite -and -not $prerequisiteResult.UrlRewriteInstalled -and $isRemoteExecution) {
                     Write-Warning "$server : IIS URL Rewrite Module not installed — skipping. Install the module manually or run the script locally on that server."
                     $missingUrlRewrite.Add($server)
@@ -423,6 +453,9 @@ begin {
             }
             if ($missingUrlRewrite.Count -gt 0) {
                 Write-Warning "Servers missing URL Rewrite Module (skipped): $([string]::Join(", ", $missingUrlRewrite))"
+            }
+            if ($conflictServers.Count -gt 0) {
+                Write-Warning "Servers with rule conflicts (rollback required): $([string]::Join(", ", $conflictServers))"
             }
             if ($notVulnerableServers.Count -gt 0) {
                 Write-Host "Servers not vulnerable (skipped): $([string]::Join(", ", $notVulnerableServers))"

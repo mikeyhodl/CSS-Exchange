@@ -63,16 +63,16 @@ function Invoke-IISConfigurationManagerAction {
 
                 if ($null -ne $result) {
                     Write-Warning "SuccessfulExecution: $($result.SuccessfulExecution) | AllActionsPerformed: $($result.AllActionsPerformed) | GatheredAllRestoreActions: $($result.GatheredAllRestoreActions) | RestoreActionsSaved: $($result.RestoreActionsSaved) | ErrorCount: $($result.ErrorContext.Count)"
-                }
 
-                if ($result.ErrorContext.Count -gt 0) {
-                    Write-Warning "Error details:"
-                    $result.ErrorContext | ForEach-Object {
-                        Write-Warning "  $_"
-                        Write-VerboseErrorInformation -CurrentError $_
+                    if ($result.ErrorContext.Count -gt 0) {
+                        Write-Warning "Error details:"
+                        $result.ErrorContext | ForEach-Object {
+                            Write-Warning "  $_"
+                            Write-VerboseErrorInformation -CurrentError $_
+                        }
+                    } else {
+                        Write-Verbose "No Error Context provided."
                     }
-                } else {
-                    Write-Verbose "No Error Context provided."
                 }
             } else {
 

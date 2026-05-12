@@ -16,11 +16,18 @@
     [bool]     RequiresUrlRewrite - Whether the IIS URL Rewrite Module must be installed
     [string]   SiteName           - The IIS site where mitigations are applied (e.g., "Default Web Site")
     [ScriptBlock] TestVulnerable
-                                    - Returns a hashtable with two boolean properties:
-                                      [bool] MitigationApplied - Whether the IIS mitigation rules
-                                             are currently present (checks by rule name).
-                                      [bool] CodeFixApplied    - Whether the server's Exchange build
-                                             includes the security fix for this CVE.
+                                    - Returns a hashtable with the following properties:
+                                      [bool]  MitigationApplied - Whether the IIS mitigation rules
+                                              are currently present AND enabled.
+                                      [bool]  CodeFixApplied    - Whether the server's Exchange build
+                                              includes the security fix for this CVE.
+                                      [array] DisabledRules     - Array of @{ Filter; PSPath } for rules
+                                              that match the mitigation but are disabled. Empty array
+                                              when no disabled rules found. The orchestrator uses this
+                                              to re-enable rules instead of creating new ones.
+                                      [bool]  RuleNameMatch     - True when a rule exists with the expected
+                                              name but does NOT match the expected behavior. Indicates a
+                                              name conflict that blocks apply — admin must rollback first.
                                       Should throw on unrecoverable errors (e.g., can't
                                       determine Exchange version). Must work over PS remoting
                                       (no module dependencies).

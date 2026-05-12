@@ -105,14 +105,20 @@ function New-IISConfigurationAction {
                     $clearParams.Add("Location", $cmdParameters["Location"])
                 }
 
+                $getActionParams = @{
+                    Filter      = $clearFilter
+                    PSPath      = $cmdParameters["PSPath"]
+                    ErrorAction = "SilentlyContinue"
+                }
+
+                if (-not([string]::IsNullOrEmpty($cmdParameters["Location"]))) {
+                    $getActionParams.Add("Location", $cmdParameters["Location"])
+                }
+
                 $getCurrentValueAction = [PSCustomObject]@{
                     Cmdlet             = "Get-WebConfiguration"
-                    Parameters         = @{
-                        Filter      = $clearFilter
-                        PSPath      = $cmdParameters["PSPath"]
-                        ErrorAction = "SilentlyContinue"
-                    }
-                    ParametersToString = (Get-ParameterString $clearParams)
+                    Parameters         = $getActionParams
+                    ParametersToString = (Get-ParameterString $getActionParams)
                 }
 
                 $restoreAction = [PSCustomObject]@{
@@ -154,9 +160,23 @@ function New-IISConfigurationAction {
             # EOMT: For Clear, the restore is an Add that re-creates the removed entry.
             # The actual value to re-add is captured at execution time by Invoke-IISConfigurationRemoteAction
             # and stored in the restore JSON file.
+            $restoreParams = @{
+                Filter      = $getParams["Filter"]
+                Name        = "."
+                ErrorAction = "SilentlyContinue"
+            }
+
+            if (-not([string]::IsNullOrEmpty($getParams["PSPath"]))) {
+                $restoreParams.Add("PSPath", $getParams["PSPath"])
+            }
+
+            if (-not([string]::IsNullOrEmpty($getParams["Location"]))) {
+                $restoreParams.Add("Location", $getParams["Location"])
+            }
+
             $restoreAction = [PSCustomObject]@{
                 Cmdlet     = $addWebConfigPropCmdlet
-                Parameters = $getParams
+                Parameters = $restoreParams
             }
         }
         # EOMT: End of URL Rewrite rule support additions

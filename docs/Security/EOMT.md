@@ -22,7 +22,8 @@ The Exchange On-premises Mitigation Tool (EOMT) applies IIS URL Rewrite mitigati
 ## Supported CVEs
 
 CVE | Description
--|-
+---|---
+CVE-2026-42897 | OWA XSS — Outbound URL Rewrite adding Content-Security-Policy header to OWA HTML responses
 CVE-2022-41040 | ProxyNotShell — Autodiscover SSRF (URL Rewrite mitigation on Default Web Site)
 CVE-2021-26855 | ProxyLogon — OWA cookie deserialization SSRF (URL Rewrite mitigation on Default Web Site)
 
@@ -39,12 +40,12 @@ CVE-2021-26855 | ProxyLogon — OWA cookie deserialization SSRF (URL Rewrite mit
 ## Parameters
 
 Parameter | Description
--|-
+---|---
 `-ExchangeServerNames` | One or more Exchange server names to target. Accepts pipeline input from `Get-ExchangeServer`. If omitted, targets the local server only.
 `-SkipExchangeServerNames` | Exchange server names to exclude when processing multiple servers.
 `-CVE` | The CVE to mitigate. If omitted, an interactive prompt allows selection. Must match a supported CVE ID.
 `-RollbackMitigation` | Roll back the mitigation for the specified CVE using the JSON backup created during apply.
-`-ShowMitigationStatus` | Display the current Code Fix (security update) and Mitigation (IIS URL Rewrite rule) status for each target server. Read-only — no changes are made.
+`-ShowMitigationStatus` | Display the current Code Fix (security update) and Mitigation (IIS URL Rewrite rule) status for each target server. Detects six states including disabled rules and name conflicts. Read-only — no changes are made.
 `-RunMSERT` | Download and run the Microsoft Safety Scanner in quick scan mode. Local execution only.
 `-RunMSERTFullScan` | Run MSERT in full scan mode (may take hours or days). Implies `-RunMSERT`. Local execution only.
 `-DoNotRunMitigation` | Skip applying the URL Rewrite mitigation. Useful with `-RunMSERT` to scan without modifying IIS.
@@ -99,14 +100,16 @@ Get-ExchangeServer | .\EOMT.ps1 -RollbackMitigation -CVE "CVE-2026-42897"
 
 ### Check vulnerability status
 
-Checks each target server and reports two properties: **Code Fix** (whether the Exchange security update is installed) and **Mitigation** (whether IIS URL Rewrite rules are present). No changes are made.
+Checks each target server and reports vulnerability status using four properties: **Code Fix** (whether the Exchange security update is installed), **Mitigation** (whether an enabled IIS URL Rewrite rule is present), **Disabled Rules** (rules matching behavior but currently disabled), and **Rule Name Match** (whether the expected rule name exists with different behavior). No changes are made.
 
 The output uses color-coded status messages:
 
-- **Code Fix installed, no mitigation** — `"N/A (protected by security update)"` (Green) — the server is fully protected; no mitigation needed.
 - **Code Fix installed, mitigation present** — `"True (can be safely rolled back)"` (Yellow) — the mitigation is redundant and can be removed.
-- **No code fix, mitigation present** — Mitigation status shown in Green — the server is temporarily protected by the IIS rule.
-- **No code fix, no mitigation** — `"ACTION REQUIRED"` (Red) — the server is unprotected.
+- **Code Fix installed, no mitigation** — `"N/A (protected by security update)"` (Green) — the server is fully protected; no mitigation needed.
+- **No code fix, mitigation present** — `"True"` (Green) — the server is temporarily protected by the IIS rule.
+- **No code fix, rule name conflict** — `"CONFLICT — rollback then re-apply"` (Red) — the expected rule name exists but with different behavior. Roll back the conflicting rule and re-apply EOMT.
+- **No code fix, matching rule disabled** — `"DISABLED — rollback then re-apply"` (Red) — a rule with the expected name is disabled; or `"False — matching rule disabled under different name. Run EOMT to apply."` (Red) — a behaviorally-matching rule exists under a different name but is disabled.
+- **No code fix, no mitigation** — `"False — ACTION REQUIRED"` (Red) — the server is unprotected.
 
 ```powershell
 .\EOMT.ps1 -ShowMitigationStatus -CVE "CVE-2026-42897"
@@ -163,6 +166,10 @@ A: Run the script once per CVE. Each CVE creates its own JSON backup file and ca
 **Q: What if the mitigation was previously applied by the legacy EOMT.ps1 or EOMTv2.ps1?**
 
 A: The new EOMT applies the same IIS URL Rewrite rules as the legacy scripts. If the rule already exists, the apply operation completes without duplicating it. To roll back a mitigation applied by a legacy script, use that same legacy script's rollback mechanism, as the JSON backup file format differs.
+
+**Q: What if the mitigation rule is disabled or has a name conflict?**
+
+A: If a mitigation rule exists but is disabled, `-ShowMitigationStatus` reports it in red. If the expected rule name is in use by a different rule (name conflict), it is also flagged. In both cases, run `-RollbackMitigation` to remove the conflicting or disabled rule first, then re-run EOMT to apply a clean mitigation.
 
 **Q: Does this script make changes that affect Exchange functionality?**
 
