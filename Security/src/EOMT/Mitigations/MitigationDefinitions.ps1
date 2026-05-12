@@ -15,13 +15,15 @@
     [string]   Description        - Human-readable description of the vulnerability and mitigation
     [bool]     RequiresUrlRewrite - Whether the IIS URL Rewrite Module must be installed
     [string]   SiteName           - The IIS site where mitigations are applied (e.g., "Default Web Site")
-    [ScriptBlock] TestMissingSecurityFix
-                                    - Returns $true if the server's Exchange build is missing
-                                      the security fix for this CVE. This checks the installed
-                                      version/patch level only — it does not check whether
-                                      the IIS mitigation is already applied.
+    [ScriptBlock] TestVulnerable
+                                    - Returns a hashtable with two boolean properties:
+                                      [bool] MitigationApplied - Whether the IIS mitigation rules
+                                             are currently present (checks by rule name).
+                                      [bool] CodeFixApplied    - Whether the server's Exchange build
+                                             includes the security fix for this CVE.
                                       Should throw on unrecoverable errors (e.g., can't
-                                      determine Exchange version).
+                                      determine Exchange version). Must work over PS remoting
+                                      (no module dependencies).
     [ScriptBlock] GetActions      - Returns an array of PSCustomObject action definitions, each with:
                                         [string]    Cmdlet      - The IIS cmdlet to execute
                                         [hashtable] Parameters  - Parameters to pass to the cmdlet

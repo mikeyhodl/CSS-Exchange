@@ -35,7 +35,7 @@ Security/src/EOMT/
 │   ├── Invoke-ApplyMitigations.ps1    # Wraps CVE actions and sends to IIS pipeline
 │   └── Invoke-RollbackMitigations.ps1 # Restores original config from JSON backup
 ├── DataCollection/
-│   └── Get-VulnerabilityStatus.ps1    # Runs TestMissingSecurityFix for a CVE
+│   └── Get-VulnerabilityStatus.ps1    # Runs TestVulnerable for a CVE; returns MitigationApplied and CodeFixApplied
 ├── Mitigations/
 │   ├── MitigationDefinitions.ps1      # CVE registry — dot-sources all CVE files
 │   ├── CVE-2021-26855.ps1             # ProxyLogon
@@ -118,8 +118,8 @@ function Get-CVE20XX99999-MitigationDefinition {
         Description            = "Short human-readable description"
         RequiresUrlRewrite     = $true
         SiteName               = "Default Web Site"
-        TestMissingSecurityFix = {
-            # Returns $true if the server IS vulnerable.
+        TestVulnerable = {
+            # Returns a hashtable with MitigationApplied (bool) and CodeFixApplied (bool).
             # Must work over PS remoting — no module dependencies!
         }
         GetActions             = {
@@ -138,10 +138,10 @@ function Get-CVE20XX99999-MitigationDefinition {
 | `Description` | `string` | Human-readable description shown in prompts and logs. |
 | `RequiresUrlRewrite` | `bool` | Set to `$true` if the mitigation needs the IIS URL Rewrite Module. The framework will auto-install it if missing. |
 | `SiteName` | `string` | The IIS site name, e.g., `"Default Web Site"`. Used in prerequisite checks. |
-| `TestMissingSecurityFix` | `ScriptBlock` | Returns `$true` if the server is **vulnerable** (missing the security fix). Should `throw` on unrecoverable errors. See [Important Constraints](#testmissingsecurityfix-constraints) below. |
+| `TestVulnerable` | `ScriptBlock` | Returns a `@{ MitigationApplied = [bool]; CodeFixApplied = [bool] }` hashtable. `MitigationApplied` indicates whether IIS mitigation rules are present. `CodeFixApplied` indicates whether the Exchange security update is installed. Should `throw` on unrecoverable errors. See [Important Constraints](#testvulnerable-constraints) below. |
 | `GetActions` | `ScriptBlock` | Returns an `array` of `[PSCustomObject]` action definitions for the IIS management pipeline. |
 
-#### TestMissingSecurityFix Constraints
+#### TestVulnerable Constraints
 
 This ScriptBlock runs on the target server via PowerShell remoting. It is passed as a string
 and recreated with `[ScriptBlock]::Create()`. This means:
@@ -149,11 +149,16 @@ and recreated with `[ScriptBlock]::Create()`. This means:
 - ❌ **No module-dependent cmdlets** (e.g., no `Get-ExchangeServer`, no `Get-WebConfiguration`)
 - ✅ **Use only built-in commands** (`Get-Command`, `Get-ItemProperty`, registry reads, etc.)
 - ✅ **Throw on failure** — the framework catches exceptions and reports them
+- ✅ **Return a hashtable** with `MitigationApplied` and `CodeFixApplied` boolean properties
 
-**Example** — version check via `ExSetup.exe`:
+**Example** — version check via `ExSetup.exe` with mitigation detection:
 
 ```powershell
-TestMissingSecurityFix = {
+TestVulnerable = {
+    $codeFixApplied = $false
+    $mitigationApplied = $false
+
+    # Check if the security update is installed
     try {
         $exchangeBuildInfo = Get-Command ExSetup.exe -ErrorAction Stop |
             ForEach-Object { $_.FileVersionInfo }
@@ -165,20 +170,26 @@ TestMissingSecurityFix = {
     if ($exchangeBuildInfo.FileMinorPart -eq 1) {
         # Exchange 2016
         if ($exchangeBuildInfo.ProductBuildPart -gt 2375) {
-            return ($fullBuildNumber -lt "15.01.2507.016")
+            $codeFixApplied = ($fullBuildNumber -ge "15.01.2507.016")
         } else {
-            return ($fullBuildNumber -lt "15.01.2375.037")
+            $codeFixApplied = ($fullBuildNumber -ge "15.01.2375.037")
         }
     } elseif ($exchangeBuildInfo.FileMinorPart -eq 2) {
         # Exchange 2019
         if ($exchangeBuildInfo.ProductBuildPart -gt 986) {
-            return ($fullBuildNumber -lt "15.02.1118.020")
+            $codeFixApplied = ($fullBuildNumber -ge "15.02.1118.020")
         } else {
-            return ($fullBuildNumber -lt "15.02.0986.036")
+            $codeFixApplied = ($fullBuildNumber -ge "15.02.0986.036")
         }
     } else {
         throw ("Exchange Server version not supported. Build: {0}" -f $fullBuildNumber)
     }
+
+    # Check if IIS mitigation rule is present
+    # (detection logic varies per CVE — see CVE-2026-42897 for advanced example)
+    $mitigationApplied = $false  # Placeholder — check for IIS URL Rewrite rule
+
+    return @{ MitigationApplied = $mitigationApplied; CodeFixApplied = $codeFixApplied }
 }
 ```
 
@@ -407,6 +418,12 @@ GetActions = {
   cleared during rollback, its children are removed automatically.
 - Targets `Default Web Site\owa` (a virtual directory) rather than the site root.
 
+> **Advanced Detection Example: CVE-2026-42897** — The `TestVulnerable` ScriptBlock for
+> CVE-2026-42897 goes beyond simple rule-name checks. It performs behavior-based detection
+> by inspecting outbound rule properties (such as `serverVariable`, action type, and action
+> value) and verifying preCondition conditions using `GetCollection()` with indexer access.
+> This ensures the mitigation is detected even if rule names have been customized.
+
 ### Step 3: Register the Definition
 
 Three changes are needed:
@@ -515,8 +532,14 @@ All real work happens here, after all pipeline input is collected.
               │
               ▼
      ┌────────────────────┐
-     │ -ShowMitigationStatus? ──Yes──► Run TestMissingSecurityFix on each server
-     │                    │           via Invoke-ScriptBlockHandler. Report and exit.
+     │ -ShowMitigationStatus? ──Yes──► Run TestVulnerable on each server
+     │                    │           via Invoke-ScriptBlockHandler.
+     │                    │           Display Code Fix and Mitigation status:
+     │                    │             CodeFix ✓ + Mitigation ✗ → "N/A (protected)" Green
+     │                    │             CodeFix ✓ + Mitigation ✓ → "Can roll back" Yellow
+     │                    │             CodeFix ✗ + Mitigation ✓ → Green
+     │                    │             CodeFix ✗ + Mitigation ✗ → "ACTION REQUIRED" Red
+     │                    │           Report and exit.
      └────────┬───────────┘
               │ No
               ▼
@@ -527,9 +550,10 @@ All real work happens here, after all pipeline input is collected.
               ▼
      ┌────────────────────────────────────────────────────────────┐
      │ Per-server prerequisite check (remote Call 1):             │
-     │   • Is the server vulnerable? (TestMissingSecurityFix)    │
-     │   • Is URL Rewrite installed? (if RequiresUrlRewrite)     │
-     │   Skip server if patched or missing URL Rewrite           │
+     │   • Run TestVulnerable → {MitigationApplied, CodeFixApplied}│
+     │   • Skip server if CodeFixApplied or MitigationApplied     │
+     │   • Is URL Rewrite installed? (if RequiresUrlRewrite)      │
+     │   Skip server if protected or missing URL Rewrite          │
      └────────┬───────────────────────────────────────────────────┘
               │
               ├── -RollbackMitigation? ──Yes──► Invoke-RollbackMitigations
@@ -549,18 +573,19 @@ When targeting remote servers, the framework makes **two remote calls** per serv
 
 | Call | Purpose | Mechanism |
 |------|---------|-----------|
-| **Call 1** | Prerequisite check — run `TestMissingSecurityFix` and check URL Rewrite | `Invoke-ScriptBlockHandler` with the ScriptBlock passed as a string |
+| **Call 1** | Prerequisite check — run `TestVulnerable` and check URL Rewrite | `Invoke-ScriptBlockHandler` with the ScriptBlock passed as a string |
 | **Call 2** | Apply or rollback — execute IIS changes | `Invoke-IISConfigurationManagerAction` → `Invoke-IISConfigurationRemoteAction` |
 
 The ScriptBlock serialization pattern for Call 1:
 
 ```powershell
 # ScriptBlocks can't be serialized over PS remoting, so we pass them as strings:
-$testString = $MitigationDefinition.TestMissingSecurityFix.ToString()
+$testString = $MitigationDefinition.TestVulnerable.ToString()
 
 # On the remote side, recreate the ScriptBlock:
 $testScript = [ScriptBlock]::Create($testString)
-$isVulnerable = & $testScript
+$status = & $testScript
+# $status is a hashtable: @{ MitigationApplied = $bool; CodeFixApplied = $bool }
 ```
 
 ---
@@ -682,9 +707,9 @@ Applying the same CVE twice is safe. On the second apply:
 
 ## 6. Key Design Decisions
 
-### Why ScriptBlocks for TestMissingSecurityFix?
+### Why ScriptBlocks for TestVulnerable?
 
-`TestMissingSecurityFix` is a `[ScriptBlock]` rather than a regular function because it
+`TestVulnerable` is a `[ScriptBlock]` rather than a regular function because it
 needs to execute on remote servers via `Invoke-ScriptBlockHandler`. PowerShell remoting
 serializes ScriptBlocks as **dead objects** (they lose their code). The framework works
 around this by:
@@ -693,7 +718,7 @@ around this by:
 2. Passing the string to the remote server.
 3. Recreating the ScriptBlock with `[ScriptBlock]::Create($string)`.
 
-This is why `TestMissingSecurityFix` cannot reference variables or functions from the
+This is why `TestVulnerable` cannot reference variables or functions from the
 calling scope — it must be completely self-contained.
 
 ### Why RuleName Is Mandatory for Top-Level Add Actions
@@ -733,19 +758,21 @@ naturally with Exchange Management Shell workflows.
 
 ## 7. Common Pitfalls
 
-### Don't Use Module-Dependent Cmdlets in TestMissingSecurityFix
+### Don't Use Module-Dependent Cmdlets in TestVulnerable
 
 ```powershell
 # ❌ WRONG — Get-ExchangeServer requires the Exchange Management Shell snapin
-TestMissingSecurityFix = {
+TestVulnerable = {
     $server = Get-ExchangeServer -Identity $env:COMPUTERNAME
-    return ($server.AdminDisplayVersion -lt "15.2.1118.20")
+    return @{ MitigationApplied = $false; CodeFixApplied = ($server.AdminDisplayVersion -ge "15.2.1118.20") }
 }
 
 # ✅ CORRECT — Use built-in commands that are always available
-TestMissingSecurityFix = {
+TestVulnerable = {
     $info = Get-Command ExSetup.exe -ErrorAction Stop | ForEach-Object { $_.FileVersionInfo }
-    return ([System.Version]$info.FileVersion -lt "15.02.1118.020")
+    $codeFixApplied = ([System.Version]$info.FileVersion -ge "15.02.1118.020")
+    $mitigationApplied = $false  # Check for IIS URL Rewrite rule presence
+    return @{ MitigationApplied = $mitigationApplied; CodeFixApplied = $codeFixApplied }
 }
 ```
 

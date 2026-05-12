@@ -260,23 +260,42 @@ begin {
         # Show mitigation status mode (read-only)
         if ($ShowMitigationStatus) {
             $statusCheckBlock = {
-                param([string]$TestSecurityFixCode)
-                $testSecurityFix = [ScriptBlock]::Create($TestSecurityFixCode)
-                return [bool](& $testSecurityFix)
+                param([string]$TestVulnerableCode)
+                $testVulnerable = [ScriptBlock]::Create($TestVulnerableCode)
+                return (& $testVulnerable)
             }
-            $testSecurityFixString = $mitigationDefinition.TestMissingSecurityFix.ToString()
+            $testVulnerableString = $mitigationDefinition.TestVulnerable.ToString()
 
             foreach ($server in $serversToProcess) {
                 Write-Host ""
                 Write-Host "Checking mitigation status for $resolvedCVE on $server"
-                $prerequisiteResult = Invoke-ScriptBlockHandler -ComputerName $server -ScriptBlock $statusCheckBlock -ArgumentList $testSecurityFixString
+                $statusResult = Invoke-ScriptBlockHandler -ComputerName $server -ScriptBlock $statusCheckBlock -ArgumentList $testVulnerableString
 
-                if ($null -eq $prerequisiteResult) {
-                    Write-Warning "$server : Unable to reach server — may still be vulnerable"
+                if ($null -eq $statusResult) {
+                    Write-Warning "$server : Unable to reach server"
                 } else {
-                    $vulnColor = if ($prerequisiteResult) { "Red" } else { "Green" }
-                    Write-Host -NoNewline "$server : Vulnerable: "
-                    Write-Host "$prerequisiteResult" -ForegroundColor $vulnColor
+                    $codeFixColor = if ($statusResult.CodeFixApplied) { "Green" } else { "Red" }
+                    Write-Host -NoNewline "$server : Code Fix Applied: "
+                    Write-Host -NoNewline "$($statusResult.CodeFixApplied)" -ForegroundColor $codeFixColor
+
+                    if ($statusResult.CodeFixApplied) {
+                        if ($statusResult.MitigationApplied) {
+                            Write-Host -NoNewline " | Mitigation Applied: "
+                            Write-Host -NoNewline "True" -ForegroundColor Green
+                            Write-Host " (can be safely rolled back)" -ForegroundColor Yellow
+                        } else {
+                            Write-Host -NoNewline " | Mitigation: "
+                            Write-Host "N/A (protected by security update)" -ForegroundColor Green
+                        }
+                    } else {
+                        Write-Host -NoNewline " | Mitigation Applied: "
+                        if ($statusResult.MitigationApplied) {
+                            Write-Host "$($statusResult.MitigationApplied)" -ForegroundColor Green
+                        } else {
+                            Write-Host -NoNewline "$($statusResult.MitigationApplied)" -ForegroundColor Red
+                            Write-Host " — ACTION REQUIRED" -ForegroundColor Red
+                        }
+                    }
                 }
             }
             return
@@ -311,23 +330,26 @@ begin {
         # This script block runs on each target server and returns a result object.
         # If it returns $null, the server is unreachable.
         # NOTE: script blocks don't survive serialization across PS remoting, so we pass
-        # the TestMissingSecurityFix script block as a string and recreate it on the remote side
+        # the TestVulnerable script block as a string and recreate it on the remote side
         # using [ScriptBlock]::Create().
-        $testSecurityFixString = $mitigationDefinition.TestMissingSecurityFix.ToString()
+        $testVulnerableString = $mitigationDefinition.TestVulnerable.ToString()
         $prerequisiteCheckBlock = {
-            param([string]$TestSecurityFixCode, [bool]$CheckUrlRewrite)
+            param([string]$TestVulnerableCode, [bool]$CheckUrlRewrite)
 
             $result = @{
-                IsVulnerable        = $true
+                CodeFixApplied      = $false
+                MitigationApplied   = $false
                 UrlRewriteInstalled = $true
                 ErrorContext        = $null
             }
 
             try {
-                $testSecurityFix = [ScriptBlock]::Create($TestSecurityFixCode)
-                $result.IsVulnerable = [bool](& $testSecurityFix)
+                $testVulnerable = [ScriptBlock]::Create($TestVulnerableCode)
+                $vulnResult = & $testVulnerable
+                $result.CodeFixApplied = [bool]$vulnResult.CodeFixApplied
+                $result.MitigationApplied = [bool]$vulnResult.MitigationApplied
             } catch {
-                $result.ErrorContext = "Unable to determine Exchange version: $_"
+                $result.ErrorContext = "Unable to determine vulnerability status: $_"
                 return $result
             }
 
@@ -359,7 +381,7 @@ begin {
                 $serverCount++
                 Write-Host "[$serverCount/$totalServers] Checking prerequisites on $server"
 
-                $prerequisiteResult = Invoke-ScriptBlockHandler -ComputerName $server -ScriptBlock $prerequisiteCheckBlock -ArgumentList $testSecurityFixString, $mitigationDefinition.RequiresUrlRewrite
+                $prerequisiteResult = Invoke-ScriptBlockHandler -ComputerName $server -ScriptBlock $prerequisiteCheckBlock -ArgumentList $testVulnerableString, $mitigationDefinition.RequiresUrlRewrite
 
                 if ($null -eq $prerequisiteResult) {
                     Write-Warning "$server : Unable to reach server — skipping (may still be vulnerable)"
@@ -373,8 +395,14 @@ begin {
                     continue
                 }
 
-                if (-not $prerequisiteResult.IsVulnerable) {
-                    Write-Host "$server : Not vulnerable to $resolvedCVE — skipping"
+                if ($prerequisiteResult.CodeFixApplied) {
+                    Write-Host "$server : Code fix applied for $resolvedCVE — skipping"
+                    $notVulnerableServers.Add($server)
+                    continue
+                }
+
+                if ($prerequisiteResult.MitigationApplied) {
+                    Write-Host "$server : Mitigation already applied for $resolvedCVE — skipping"
                     $notVulnerableServers.Add($server)
                     continue
                 }

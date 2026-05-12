@@ -44,7 +44,7 @@ Parameter | Description
 `-SkipExchangeServerNames` | Exchange server names to exclude when processing multiple servers.
 `-CVE` | The CVE to mitigate. If omitted, an interactive prompt allows selection. Must match a supported CVE ID.
 `-RollbackMitigation` | Roll back the mitigation for the specified CVE using the JSON backup created during apply.
-`-ShowMitigationStatus` | Display the current vulnerability status for each target server. Read-only — no changes are made.
+`-ShowMitigationStatus` | Display the current Code Fix (security update) and Mitigation (IIS URL Rewrite rule) status for each target server. Read-only — no changes are made.
 `-RunMSERT` | Download and run the Microsoft Safety Scanner in quick scan mode. Local execution only.
 `-RunMSERTFullScan` | Run MSERT in full scan mode (may take hours or days). Implies `-RunMSERT`. Local execution only.
 `-DoNotRunMitigation` | Skip applying the URL Rewrite mitigation. Useful with `-RunMSERT` to scan without modifying IIS.
@@ -99,7 +99,14 @@ Get-ExchangeServer | .\EOMT.ps1 -RollbackMitigation -CVE "CVE-2026-42897"
 
 ### Check vulnerability status
 
-Checks each target server's Exchange build/patch level to determine if the security fix is missing. No changes are made.
+Checks each target server and reports two properties: **Code Fix** (whether the Exchange security update is installed) and **Mitigation** (whether IIS URL Rewrite rules are present). No changes are made.
+
+The output uses color-coded status messages:
+
+- **Code Fix installed, no mitigation** — `"N/A (protected by security update)"` (Green) — the server is fully protected; no mitigation needed.
+- **Code Fix installed, mitigation present** — `"True (can be safely rolled back)"` (Yellow) — the mitigation is redundant and can be removed.
+- **No code fix, mitigation present** — Mitigation status shown in Green — the server is temporarily protected by the IIS rule.
+- **No code fix, no mitigation** — `"ACTION REQUIRED"` (Red) — the server is unprotected.
 
 ```powershell
 .\EOMT.ps1 -ShowMitigationStatus -CVE "CVE-2026-42897"
@@ -132,7 +139,7 @@ Get-ExchangeServer | .\EOMT.ps1 -CVE "CVE-2026-42897" -SkipExchangeServerNames "
 ## How It Works
 
 1. **CVE selection** — If `-CVE` is not provided, the script displays an interactive menu of available mitigations sorted by priority and prompts for selection.
-2. **Prerequisite check** — Each target server is checked remotely for Exchange version/patch level and IIS URL Rewrite Module availability. Servers that are already patched, unreachable, or missing prerequisites are reported and skipped.
+2. **Prerequisite check** — Each target server is checked remotely for two conditions: whether the Exchange security update (code fix) is installed and whether the IIS URL Rewrite mitigation rule is already present. Servers where either the code fix or the mitigation is already applied are skipped. Servers that are unreachable or missing prerequisites (e.g., IIS URL Rewrite Module) are reported and skipped.
 3. **Mitigation apply** — IIS URL Rewrite rules are added using the IIS configuration management pipeline. Before any changes are made, the current IIS state is captured and saved to a per-CVE JSON backup file at `%WINDIR%\System32\inetsrv\config\`.
 4. **Rollback** — When `-RollbackMitigation` is specified, the JSON backup file is read and each original setting is restored. The backup file is then renamed to `.bak`.
 
@@ -147,7 +154,7 @@ Get-ExchangeServer | .\EOMT.ps1 -CVE "CVE-2026-42897" -SkipExchangeServerNames "
 
 **Q: What happens if I run the script without any parameters?**
 
-A: The script prompts you to select a CVE from the available mitigations. It then checks if your local server is vulnerable and applies the mitigation if needed.
+A: The script prompts you to select a CVE from the available mitigations. It then checks if your local server needs protection (by verifying both the security update and mitigation status) and applies the mitigation if needed.
 
 **Q: Can I apply mitigations for multiple CVEs at once?**
 
