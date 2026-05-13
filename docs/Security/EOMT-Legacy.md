@@ -4,7 +4,7 @@
 
       This script has been replaced by the unified [Exchange On-premises Mitigation Tool (EOMT)](EOMT.md), which supports multiple CVEs, JSON-backed rollback, and remote execution. Please use the new EOMT for all current and future mitigations. This page is retained for historical reference only.
 
-Download the latest release: [EOMT.ps1](https://github.com/microsoft/CSS-Exchange/releases/latest/download/EOMT.ps1)
+Download the latest release: [EOMT-Legacy.ps1](https://github.com/microsoft/CSS-Exchange/releases/latest/download/EOMT-Legacy.ps1)
 
 This legacy script contained mitigations to help address the following vulnerability:
 
