@@ -64,7 +64,7 @@ function Install-IISUrlRewriteModule {
                 "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
             )
 
-            New-PSDrive -Name HKU -PSProvider Registry -Root Registry::HKEY_USERS -ErrorAction SilentlyContinue | Out-Null
+            New-PSDrive -Name HKU -PSProvider Registry -Root Registry::HKEY_USERS -WhatIf:$false -ErrorAction SilentlyContinue | Out-Null
 
             $UninstallKeys += Get-ChildItem HKU: | Where-Object { $_.Name -match 'S-\d-\d+-(\d+-){1,14}\d+$' } | ForEach-Object {
                 "HKU:\$($_.PSChildName)\Software\Microsoft\Windows\CurrentVersion\Uninstall"
