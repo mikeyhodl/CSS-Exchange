@@ -14,6 +14,23 @@
 * From PS7, run `.build\Build.ps1`. Test the resulting script in `dist/`.
 * Commit the changes on your own branch and open a Pull Request.
 
+## Git Hooks (Optional)
+
+Pre-commit hooks are available to catch common issues before committing:
+- **Sensitive data scanning** on test data files (blocks unrecognized email domains, public IPs, credential-like values)
+- **Pester test run count** checking (blocks if a test file exceeds 5 pipeline runs)
+- **PSScriptAnalyzer** validation on staged PowerShell files
+
+To enable, run once after cloning:
+
+```powershell
+.github/Install-GitHooks.ps1
+```
+
+This sets `core.hooksPath` to `.github/GitHooks/`. Hook updates are picked up automatically on `git pull`. Use `git commit --no-verify` to bypass hooks when needed.
+
+PSScriptAnalyzer >= 1.24 is required for full hook coverage. Install with `Install-Module PSScriptAnalyzer -MinimumVersion 1.24`. Without it, the analyzer check is skipped.
+
 It is recommended to use Visual Studio Code when developing scripts for this project. Opening VSCode at
 the root of this repo will ensure that VSCode uses the settings in the repro to enforce most of the
 formatting rules.
