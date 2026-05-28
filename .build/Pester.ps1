@@ -42,7 +42,7 @@ begin {
 
     $root = Get-Item "$PSScriptRoot\.."
     $scripts = @(Get-ChildItem -Recurse $root |
-            Where-Object { $_.Name -like "*.Tests.ps1" })
+            Where-Object { $_.Name -like "*.Tests.ps1" -and $_.FullName -notmatch "\.github" })
 
     $parentProgress = @{
         Id              = 0

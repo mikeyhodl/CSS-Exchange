@@ -1,8 +1,9 @@
+!scriptblock
 adfs
 Adsi
 amsi
-Antispam
 anob
+Antispam
 asmx
 Authenticode
 authsspi
@@ -43,11 +44,12 @@ exfiltration
 fabrikam
 FIPFS
 fips
-Fsis
 fltmc
 freb
+Fsis
 FYDIBOHF
 GCDO
+github
 globalsequence
 Hashtable
 HHMM
@@ -112,8 +114,8 @@ notin
 notlike
 notmatch
 nspi
-ntlm
 NTFS
+ntlm
 NUMA
 nupkg
 odata
@@ -142,7 +144,6 @@ Runtimes
 sccm
 Schannel
 SCOM
-!scriptblock
 SERVERNAME
 Servicehost
 servicelet
