@@ -35,16 +35,17 @@ function Invoke-CodeFormatterOnFiles {
 
     $repoRoot = Get-Item "$PSScriptRoot\.."
     $errorCount = 0
+    $filesToCheck = New-Object System.Collections.Generic.List[object]
 
-    $filesToCheck = foreach ($path in $FilePaths) {
+    foreach ($path in $FilePaths) {
         if (Test-Path -Path $path) {
-            Get-Item -Path $path
+            $filesToCheck.Add((Get-Item -Path $path))
         } else {
             Write-Warning "File not found, skipping: $path"
         }
     }
 
-    if ($null -eq $filesToCheck -or $filesToCheck.Count -eq 0) {
+    if ($filesToCheck.Count -eq 0) {
         Write-Host "No valid files to check."
         return 0
     }
