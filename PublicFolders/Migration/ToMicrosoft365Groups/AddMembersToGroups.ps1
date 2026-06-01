@@ -176,7 +176,7 @@ function ValidateAndAddUserToList() {
 
         if ($ArePublicFoldersOnPremises) {
             if ($userType -ne [RecipientType]::MailUniversalSecurityGroup) {
-                return ValidateAndAddRemoteUserToList -user $user -smtpAddress $smtpAddress -userType $userType -accessRight $accessRights
+                return ValidateAndAddRemoteUserToList -user $user -smtpAddress $smtpAddress -userType $userType -accessRight $accessRight
             }
         }
     } else {
