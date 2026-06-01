@@ -76,7 +76,7 @@ $pfMailPropCsv      = Join-Path $BackupDir ($prefix + "PfMailProperties.csv")
 $logPath            = Join-Path $BackupDir ($prefix + "PfLockdown_summary.log")
 
 $LocalizedStrings = ConvertFrom-StringData @'
-WhatIfEnabled = IMPORTANT!!! WhatIf parameter is set, therefore no changes will be made. The messages shown are just a preview of the actual execution. All backup files are expected with a 'test_' prefix. If actual lockdown is performed, please create a copy of the backup files with prefix 'text_' to see the preview of this script.
+WhatIfEnabled = IMPORTANT!!! WhatIf parameter is set, therefore no changes will be made. The messages shown are just a preview of the actual execution. All backup files are expected with a 'test_' prefix. If actual lockdown is performed, please create a copy of the backup files with prefix 'test_' to see the preview of this script.
 UnsuccessfulGetRecipientPermissionCmdlet = Get-RecipientPermission cmdlet could not be executed. Please make sure the user is a member of role groups 'Organization Management' and 'Recipient Management' and try again.
 BackupNotFound = Following backup files for recovery does not exists: {0}. Please move the files to backup directory and re-run the script.
 ReadingPfPerms = Reading public folder permissions..
@@ -104,7 +104,7 @@ AddingSendOnBehalfToPermissionFailed = Adding SendOnBehalfTo permission of user 
 AddingSendAsToPfFailed = Adding SendAs permission to public folder {0} failed..
 AddedPropertiesBackToPf = The following properties are added back to public folder '{0}': SendAs permissions of users {1}, SendOnBehalfTo permissions of users {2}, emailAddressPolicyEnabled {3}.
 PfRecoveryComplete = Public folders successfully restored.
-EXOV2ModuleNotInstalled = This script uses modern authenticaion to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module.
+EXOV2ModuleNotInstalled = This script uses modern authentication to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module.
 '@
 
 ###################### END OF DEFAULTS ######################

@@ -127,7 +127,7 @@ RemovingPfPerm = Removing permissions of user {0} on public folder {1}.
 AddingPfPerm = Adding permissions ({2}) for user {0} on {1}.
 LockdownWithReadOnlyPermsSuccessful = Public folders being migrated are successfully locked down with ReadOnly permission.
 PfLockdownComplete = Public folder lockdown is complete.
-EXOV2ModuleNotInstalled = This script uses modern authenticaion to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module.
+EXOV2ModuleNotInstalled = This script uses modern authentication to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module.
 '@
 
 ###################### END OF DEFAULTS ######################

@@ -3,7 +3,7 @@
 
 # .SYNOPSIS
 # Import-MailPublicFolders.ps1
-#    Create dummy mail public folder objects in target forest
+# Create dummy mail public folder objects in target forest
 #
 # The script needs to be run from Onprem.
 #
@@ -39,7 +39,7 @@ function CreateTenantSession() {
     if (Get-Module -Name ExchangeOnlineManagement) {
         Connect-ExchangeOnline -Credential $Credential -ConnectionUri $ConnUri -Prefix "Remote" -ErrorAction SilentlyContinue
     } else {
-        Write-Warning "This script uses modern authenticaion to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/en-us/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module."
+        Write-Warning "This script uses modern authentication to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/en-us/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module."
         exit
     }
 }

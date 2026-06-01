@@ -340,7 +340,7 @@ AddingMembersAndOwners =  Updating links of the group '{0}' by adding the follow
 DefaultPermissionNotNone = Default permission for the public folder '{0}' is '{1}', but only users with explicit permission entries were added as members to the group '{2}'. Please change the privacy setting of the group to 'Public' if you need it to be accessible to everyone.
 AddingMembersSuccessful = All the users with explicit permissions (except None, FolderVisible, and CreateSubFolders) to access input public folders have been added as Owners/Members to the respective group successfully!
 CommandToAddMembers = Note: Please use the following cmdlet to add new members to the group if required. 'Add-UnifiedGroupLinks -Identity <Group> -LinkType [Owners | Members] -Links <list of users>'.
-EXOV2ModuleNotInstalled = This script uses modern authenticaion to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module.
+EXOV2ModuleNotInstalled = This script uses modern authentication to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module.
 '@
 
 ################ END OF DECLARATION #################

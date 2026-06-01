@@ -11,11 +11,6 @@
 #    the local Exchange deployment. Then, using the credentials provided, the script will create a session against Exchange Online,
 #    which will be used to manipulate O365 Active Directory objects remotely.
 #
-#    Copyright (c) 2014 Microsoft Corporation. All rights reserved.
-#
-#    THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE RISK
-#    OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
-#
 # .PARAMETER Credential
 #    Exchange Online user name and password. Don't use this param if MFA is enabled.
 #
@@ -586,7 +581,7 @@ DeleteDuplicateMailPublicFoldersinFile = Deleting duplicate mail public folders 
 AddAddressesFromDuplicates = Adding email addresses from duplicates...
 MailEnablePublicFoldersWithProxyGUIDinFile = Mail-enabling public folders mentioned in {0}.
 MailEnablePFAssociatedToDisconnectedMEPFsInFile = Resetting MailEnabled and MailRecipientGuid properties of public folders corresponding to disconnected mepfs mentioned in {0}.
-EXOV2ModuleNotInstalled = This script uses modern authenticaion to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/en-us/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module.
+EXOV2ModuleNotInstalled = This script uses modern authentication to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/en-us/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module.
 '@
 
 #minimum supported exchange version to run this script
