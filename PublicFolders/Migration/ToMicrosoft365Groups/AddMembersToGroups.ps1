@@ -81,7 +81,16 @@ param(
 function InitializeExchangeOnlineRemoteSession() {
     Import-Module ExchangeOnlineManagement -ErrorAction SilentlyContinue
     if (Get-Module ExchangeOnlineManagement) {
-        Connect-ExchangeOnline -Credential $Credential -ConnectionUri $ConnectionUri -Prefix "Remote" -ErrorAction SilentlyContinue
+        $connectParams = @{
+            ConnectionUri = $ConnectionUri
+            Prefix        = "Remote"
+            ErrorAction   = "SilentlyContinue"
+        }
+
+        if ($null -ne $Credential) {
+            $connectParams.Credential = $Credential
+        }
+        Connect-ExchangeOnline @connectParams
         $script:isConnectedToExchangeOnline = $true
     } else {
         Write-Warning $LocalizedStrings.EXOV2ModuleNotInstalled

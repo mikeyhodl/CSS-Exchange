@@ -37,7 +37,16 @@ function CreateTenantSession() {
 
     Import-Module -Name ExchangeOnlineManagement -ErrorAction SilentlyContinue
     if (Get-Module -Name ExchangeOnlineManagement) {
-        Connect-ExchangeOnline -Credential $Credential -ConnectionUri $ConnUri -Prefix "Remote" -ErrorAction SilentlyContinue
+        $connectParams = @{
+            ConnectionUri = $ConnUri
+            Prefix        = "Remote"
+            ErrorAction   = "SilentlyContinue"
+        }
+
+        if ($null -ne $Credential) {
+            $connectParams.Credential = $Credential
+        }
+        Connect-ExchangeOnline @connectParams
     } else {
         Write-Warning "This script uses modern authentication to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/en-us/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module."
         exit
