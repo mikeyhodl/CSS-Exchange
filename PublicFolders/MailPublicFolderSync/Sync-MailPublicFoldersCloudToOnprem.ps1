@@ -89,8 +89,7 @@ function InitializeExchangeOnlineRemoteSession() {
     try {
         Import-Module ExchangeOnlineManagement -ErrorAction SilentlyContinue
         if (Get-Module ExchangeOnlineManagement) {
-            $sessionOption = (New-PSSessionOption -SkipCACheck)
-            Connect-ExchangeOnline -Credential $Credential -ConnectionURI $ConnectionUri -PSSessionOption $sessionOption -Prefix "Remote" -ErrorAction SilentlyContinue
+            Connect-ExchangeOnline -Credential $Credential -ConnectionUri $ConnectionUri -Prefix "Remote" -ErrorAction SilentlyContinue
             $script:isConnectedToExchangeOnline = $true
         } else {
             Write-Warning $LocalizedStrings.EXOV2ModuleNotInstalled

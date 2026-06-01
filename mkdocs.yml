@@ -99,16 +99,24 @@ nav:
     - ExPerfAnalyzer: Performance/ExPerfAnalyzer.md
     - SimplePerf: Performance/SimplePerf.md
   - PublicFolders:
-    - Hybrid:
-      - Import-PublicFolderMailboxes: PublicFolders/Hybrid/Import-PublicFolderMailboxes.md
-      - Sync-MailPublicFoldersCloudToOnprem: PublicFolders/Hybrid/Sync-MailPublicFoldersCloudToOnprem.md
+    - MailPublicFolderSync:
+      - Import-MailPublicFolders: PublicFolders/MailPublicFolderSync/Import-MailPublicFolders.md
+      - Import-PublicFolderMailboxes: PublicFolders/MailPublicFolderSync/Import-PublicFolderMailboxes.md
+      - Sync-MailPublicFolders: PublicFolders/MailPublicFolderSync/Sync-MailPublicFolders.md
+      - Sync-MailPublicFoldersCloudToOnprem: PublicFolders/MailPublicFolderSync/Sync-MailPublicFoldersCloudToOnprem.md
+      - Sync-ModernMailPublicFolders: PublicFolders/MailPublicFolderSync/Sync-ModernMailPublicFolders.md
     - Migration:
-      - Export-ModernPublicFolderStatistics: PublicFolders/Migration/Export-ModernPublicFolderStatistics.md
-      - ModernPublicFolderToMailboxMapGenerator: PublicFolders/Migration/ModernPublicFolderToMailboxMapGenerator.md
-      - SetMailPublicFolderExternalAddress: PublicFolders/Migration/SetMailPublicFolderExternalAddress.md
-      - Sync-ModernMailPublicFolders: PublicFolders/Migration/Sync-ModernMailPublicFolders.md
+      - ToExchangeOnline:
+        - Export-ModernPublicFolderStatistics: PublicFolders/Migration/ToExchangeOnline/Export-ModernPublicFolderStatistics.md
+        - ModernPublicFolderToMailboxMapGenerator: PublicFolders/Migration/ToExchangeOnline/ModernPublicFolderToMailboxMapGenerator.md
+        - SetMailPublicFolderExternalAddress: PublicFolders/Migration/ToExchangeOnline/SetMailPublicFolderExternalAddress.md
+      - ToMicrosoft365Groups:
+        - LockAndSavePublicFolderProperties: PublicFolders/Migration/ToMicrosoft365Groups/LockAndSavePublicFolderProperties.md
+        - AddMembersToGroups: PublicFolders/Migration/ToMicrosoft365Groups/AddMembersToGroups.md
+        - UnlockAndRestorePublicFolderProperties: PublicFolders/Migration/ToMicrosoft365Groups/UnlockAndRestorePublicFolderProperties.md
     - Export-PublicFolderStatistics: PublicFolders/Export-PublicFolderStatistics.md
     - ManagePublicFolderPermissions: PublicFolders/ManagePublicFolderPermissions.md
+    - Move-PublicFolderBranch: PublicFolders/Move-PublicFolderBranch.md
     - SourceSideValidations: PublicFolders/SourceSideValidations.md
     - Update-PublicFolderPermissions: PublicFolders/Update-PublicFolderPermissions.md
     - ValidateMailEnabledPublicFolders: PublicFolders/ValidateMailEnabledPublicFolders.md

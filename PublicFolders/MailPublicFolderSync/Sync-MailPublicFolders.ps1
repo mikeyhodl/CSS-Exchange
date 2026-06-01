@@ -2,14 +2,19 @@
 # Licensed under the MIT License.
 
 # .SYNOPSIS
-#    Syncs modern mail-enabled public folder objects from the local Exchange deployment into O365. It uses the local Exchange deployment
+#    Syncs mail-enabled public folder objects from the local Exchange deployment into O365. It uses the local Exchange deployment
 #    as master to determine what changes need to be applied to O365. The script will create, update or delete mail-enabled public
 #    folder objects on O365 Active Directory when appropriate.
 #
 # .DESCRIPTION
-#    The script must be executed from an Exchange 2013 or later Management Shell window providing access to mail public folders in
+#    The script must be executed from an Exchange 2007 or 2010 Management Shell window providing access to mail public folders in
 #    the local Exchange deployment. Then, using the credentials provided, the script will create a session against Exchange Online,
 #    which will be used to manipulate O365 Active Directory objects remotely.
+#
+#    Copyright (c) 2014 Microsoft Corporation. All rights reserved.
+#
+#    THIS CODE IS MADE AVAILABLE AS IS, WITHOUT WARRANTY OF ANY KIND. THE ENTIRE RISK
+#    OF THE USE OR THE RESULTS FROM THE USE OF THIS CODE REMAINS WITH THE USER.
 #
 # .PARAMETER Credential
 #    Exchange Online user name and password. Don't use this param if MFA is enabled.
@@ -35,14 +40,14 @@
 #    without having to apply any of those changes. You don't have to specify a value with the WhatIf switch.
 #
 # .EXAMPLE
-#    .\Sync-ModernMailPublicFolders.ps1 -CsvSummaryFile:sync_summary.csv
+#    .\Sync-MailPublicFolders.ps1 -CsvSummaryFile:sync_summary.csv
 #
 #    This example shows how to sync mail-public folders from your local deployment to Exchange Online. Note that the script outputs a CSV file listing all operations executed, and possibly errors encountered, during sync.
 #
 # .EXAMPLE
-#    .\Sync-ModernMailPublicFolders.ps1 -CsvSummaryFile:sync_summary.csv -ConnectionUri:"https://partner.outlook.cn/PowerShell"
+#    .\Sync-MailPublicFolders.ps1 -CsvSummaryFile:sync_summary.csv -ConnectionUri:"https://partner.outlook.cn/PowerShell"
 #
-#    This example shows how to use a different URI to connect to Exchange Online and sync modern mail-public folders from your local deployment.
+#    This example shows how to use a different URI to connect to Exchange Online and sync mail-public folders from your local deployment.
 #
 param(
     [Parameter(Mandatory=$false)]
@@ -69,8 +74,6 @@ param(
     [switch] $WhatIf = $false
 )
 
-# cSpell:words mepf, mepfs, EXOV2, MEPFDNs
-
 # Writes a dated information message to console
 function WriteInfoMessage() {
     param ($message)
@@ -91,22 +94,22 @@ function WriteVerboseMessage() {
 
 # Writes an error importing a mail public folder to the CSV summary
 function WriteErrorSummary() {
-    param ($folder, $operation, $errorMessage, $commandText)
+    param ($folder, $operation, $errorMessage, $commandtext)
 
-    WriteOperationSummary -folder $folder.Guid -operation $operation -result $errorMessage -commandText $commandText
+    WriteOperationSummary -folder $folder.Guid -operation $operation -result $errorMessage -commandtext $commandtext
     $script:errorsEncountered++
 }
 
 # Writes the operation executed and its result to the output CSV
 function WriteOperationSummary() {
-    param ($folder, $operation, $result, $commandText)
+    param ($folder, $operation, $result, $commandtext)
 
     $columns = @(
         (Get-Date).ToString(),
         $folder.Guid,
         $operation,
         (EscapeCsvColumn $result),
-        (EscapeCsvColumn $commandText)
+        (EscapeCsvColumn $commandtext)
     )
 
     Add-Content $CsvSummaryFile -Value ("{0},{1},{2},{3},{4}" -f $columns)
@@ -147,21 +150,19 @@ function WriteProgress() {
         -PercentComplete (100 * ($script:itemsProcessed + $statusProcessed)/$script:totalItems)
 }
 
-# Create a tenant PSSession against Exchange Online with modern auth.
+# Create a tenant PSSession against Exchange Online using modern auth.
 function InitializeExchangeOnlineRemoteSession() {
     WriteInfoMessage $LocalizedStrings.CreatingRemoteSession
 
     $oldWarningPreference = $WarningPreference
     $oldVerbosePreference = $VerbosePreference
-
     try {
         Import-Module ExchangeOnlineManagement -ErrorAction SilentlyContinue
         if (Get-Module ExchangeOnlineManagement) {
-            $sessionOption = (New-PSSessionOption -SkipCACheck)
-            Connect-ExchangeOnline -Credential $Credential -ConnectionUri $ConnectionUri -PSSessionOption $sessionOption -Prefix "Remote" -ErrorAction SilentlyContinue
+            Connect-ExchangeOnline -Credential $Credential -ConnectionUri $ConnectionUri -Prefix "Remote" -ErrorAction SilentlyContinue
             $script:isConnectedToExchangeOnline = $true
         } else {
-            WriteWarningMessage $LocalizedStrings.EXOV2ModuleNotInstalled
+            Write-Warning $LocalizedStrings.EXOV2ModuleNotInstalled
             exit
         }
     } finally {
@@ -180,7 +181,7 @@ function NewMailEnabledPublicFolder() {
     if ($localFolder.PrimarySmtpAddress.ToString() -eq "") {
         $errorMsg = ($LocalizedStrings.FailedToCreateMailPublicFolderEmptyPrimarySmtpAddress -f $localFolder.Guid)
         Write-Error $errorMsg
-        WriteErrorSummary -folder $localFolder -operation $LocalizedStrings.CreateOperationName -errorMessage $errorMsg -commandText ""
+        WriteErrorSummary -folder $localFolder -operation $LocalizedStrings.CreateOperationName -errorMessage $errorMsg -commandtext ""
         return
     }
 
@@ -197,14 +198,15 @@ function NewMailEnabledPublicFolder() {
     }
 
     try {
+        # Assign to $null to suppress the cmdlet's pipeline output
         $null = &$script:NewSyncMailPublicFolderCommand @newParams
-        WriteOperationSummary -folder $localFolder -operation $LocalizedStrings.CreateOperationName -result $LocalizedStrings.CsvSuccessResult -commandText $commandText
+        WriteOperationSummary -folder $localFolder -operation $LocalizedStrings.CreateOperationName -result $LocalizedStrings.CsvSuccessResult -commandtext $commandText
 
         if (-not $WhatIf) {
             $script:ObjectsCreated++
         }
     } catch {
-        WriteErrorSummary -folder $localFolder -operation $LocalizedStrings.CreateOperationName -errorMessage $error[0].Exception.Message -commandText $commandText
+        WriteErrorSummary -folder $localFolder -operation $LocalizedStrings.CreateOperationName -errorMessage $error[0].Exception.Message -commandtext $commandText
         Write-Error $_
     }
 }
@@ -231,13 +233,13 @@ function RemoveMailEnabledPublicFolder() {
 
     try {
         &$script:RemoveSyncMailPublicFolderCommand @removeParams
-        WriteOperationSummary -folder $remoteFolder -operation $LocalizedStrings.RemoveOperationName -result $LocalizedStrings.CsvSuccessResult -commandText $commandText
+        WriteOperationSummary -folder $remoteFolder -operation $LocalizedStrings.RemoveOperationName -result $LocalizedStrings.CsvSuccessResult -commandtext $commandText
 
         if (-not $WhatIf) {
             $script:ObjectsDeleted++
         }
     } catch {
-        WriteErrorSummary -folder $remoteFolder -operation $LocalizedStrings.RemoveOperationName -errorMessage $_.Exception.Message -commandText $commandText
+        WriteErrorSummary -folder $remoteFolder -operation $LocalizedStrings.RemoveOperationName -errorMessage $_.Exception.Message -commandtext $commandText
         Write-Error $_
     }
 }
@@ -267,13 +269,13 @@ function UpdateMailEnabledPublicFolder() {
 
     try {
         &$script:SetMailPublicFolderCommand @setParams
-        WriteOperationSummary -folder $remoteFolder -operation $LocalizedStrings.UpdateOperationName -result $LocalizedStrings.CsvSuccessResult -commandText $commandText
+        WriteOperationSummary -folder $remoteFolder -operation $LocalizedStrings.UpdateOperationName -result $LocalizedStrings.CsvSuccessResult -commandtext $commandText
 
         if (-not $WhatIf) {
             $script:ObjectsUpdated++
         }
     } catch {
-        WriteErrorSummary -folder $remoteFolder -operation $LocalizedStrings.UpdateOperationName -errorMessage $_.Exception.Message -commandText $commandText
+        WriteErrorSummary -folder $remoteFolder -operation $LocalizedStrings.UpdateOperationName -errorMessage $_.Exception.Message -commandtext $commandText
         Write-Error $_
     }
 }
@@ -410,7 +412,7 @@ function checkForInconsistenciesWithMEPF() {
         $script:mailPublicFoldersDisconnectedFile
     )
 
-    # If there are any inconsistencies with mail-enabled public folders, the ValidateMepf script outputs any of these files
+    # If there are any inconsistencies with mail-enabled public folders, the validatemepf script outputs any of these files
     for ($i = 0; $i -lt $files.Length; $i++) {
         if (Test-Path $files[$i]) {
             return $true
@@ -503,7 +505,7 @@ function RemoveMEPFAndAddEmailAddresses() {
             $emailAddressesToAdd += $emailAddress.ToString()
         }
     }
-    Set-MailPublicFolder $publicFolder -EmailAddresses @{add =$emailAddressesToAdd }
+    Set-MailPublicFolder $publicFolder -EmailAddresses @{add=$emailAddressesToAdd }
 }
 
 ################ DECLARING GLOBAL VARIABLES ################
@@ -570,22 +572,25 @@ ProgressBarStatusUpdating = Updating existing items on Exchange Online: {0}/{1}.
 ProgressBarStatusCreating = Creating new items on Exchange Online: {0}/{1}.
 SyncMailPublicFolderObjectsComplete = Syncing of mail public folder objects into Active Directory completed: {0} objects created, {1} objects updated and {2} objects deleted.
 ErrorsFoundDuringImport = Total errors found: {0}. Please, check the error summary at '{1}' for more information.
+LocalServerVersionNotSupported = You cannot execute this script from your local Exchange server: "{0}". This script can only be executed from Exchange 2007 Management Shell and above.
 ForceParameterRequired = You are about to remove ALL mail-enabled public folders from Exchange Online Active Directory. Only proceed if you do not have any users on Exchange Online already using mail-enabled public folders. Also, make sure your local Exchange deployment doesn't have any mail-enabled public folders by running Get-MailPublicFolder. You can bypass this warning by running the script using the -Force parameter.
-SystemFoldersSkipped = The following {0} mail-enabled public folder(s) will not be synced as they are linked to system public folders. These folders are not applicable for Exchange Online.
-UnableToDetectSystemMailPublicFolders = The script is unable to determine a list of system public folders while the local public folder deployment is locked for migration. This may cause some mail-enabled system public folders to be synced to Exchange Online Active Directory and cause Public Folder migration to fail. If that happens, you can run "Set-MailPublicFolder -IgnoreMissingFolderLink:$true" for each AD object that is a system folder and resume the migration. Note that these system folders don't need to be mail-enabled on Exchange 2013 or later, so it is completely safe to ignore errors reported while mail-enabling them during migration. To learn more about system public folders, please read the following TechNet article: https://technet.microsoft.com/en-us/library/bb397221(v=exchg.151).aspx#Trees.
+SystemFoldersSkipped = The following {0} mail-enabled public folder(s) will not be synced as they are linked to legacy system public folders. These folders are not applicable for Exchange Online.
+UnableToDetectSystemMailPublicFolders = The script is unable to determine a list of legacy system public folders while the local public folder deployment is locked for migration. This may cause some mail-enabled system public folders on the legacy system to be synced to Exchange Online Active Directory and cause Public Folder migration to fail. If that happens, you can run "Set-MailPublicFolder -IgnoreMissingFolderLink:$true" for each AD object that is a legacy system folder and resume the migration. Note that these legacy system folders don't need to be mail-enabled on Exchange 2013 or later, so it is completely safe to ignore errors reported while mail-enabling them during migration. To learn more about legacy system public folders, please read the following TechNet article: https://technet.microsoft.com/en-us/library/bb397221(v=exchg.141).aspx#Trees.
 ValidateMailEnabledPublicFoldersFailed = Validating Mail Enabled Public Folders failed. Continuing to sync Mail Public Folders to Exchange Online.
 DownloadingValidateMEPFScript = Downloading ValidateMailEnabledPublicFolders script...
-DownloadValidateMEPFScriptFailed = Unable to download ValidateMailEnabledPublicFolders script. Download it from https://aka.ms/validatemepf to {0} and execute Sync-ModernMailPublicFolders.ps1 again.
-FoundInconsistenciesWithMEPFs = Found some inconsistencies with mail-enabled public folders. To fix them run Sync-ModernMailPublicFolders.ps1 script with -FixInconsistencies parameter.
+DownloadValidateMEPFScriptFailed = Unable to download ValidateMailEnabledPublicFolders script. Download it from https://aka.ms/validatemepf to {0} and execute Sync-MailPublicFolders.ps1 again.
+FoundInconsistenciesWithMEPFs = Found some inconsistencies with mail-enabled public folders. To fix them run Sync-MailPublicFolders.ps1 script with -FixInconsistencies parameter.
 MailDisablePublicFoldersInFile = Mail disabling public folders mentioned in {0}.
 DeleteOrphanedMailPublicFoldersInFile = Deleting orphaned mail public folders mentioned in {0}.
-DeleteDuplicateMailPublicFoldersInFile = Deleting duplicate mail public folders mentioned in {0}.
+DeleteDuplicateMailPublicFoldersinFile = Deleting duplicate mail public folders mentioned in {0}.
 AddAddressesFromDuplicates = Adding email addresses from duplicates...
 MailEnablePublicFoldersWithProxyGUIDinFile = Mail-enabling public folders mentioned in {0}.
 MailEnablePFAssociatedToDisconnectedMEPFsInFile = Resetting MailEnabled and MailRecipientGuid properties of public folders corresponding to disconnected mepfs mentioned in {0}.
-EXOV2ModuleNotInstalled = This script uses modern authentication to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module.
+EXOV2ModuleNotInstalled = This script uses modern authenticaion to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/en-us/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module.
 '@
 
+#minimum supported exchange version to run this script
+$minSupportedVersion = 8
 ################ END OF DECLARATION #################
 
 try {
@@ -600,11 +605,19 @@ if (Test-Path $CsvSummaryFile) {
 }
 
 # Write the output CSV headers
+# Assign to $null to suppress the FileInfo object that New-Item returns to the pipeline
 $null = New-Item -Path $CsvSummaryFile -ItemType File -Force -ErrorAction:Stop -Value ("#{0},{1},{2},{3},{4}`r`n" -f $LocalizedStrings.TimestampCsvHeader,
     $LocalizedStrings.IdentityCsvHeader,
     $LocalizedStrings.OperationCsvHeader,
     $LocalizedStrings.ResultCsvHeader,
     $LocalizedStrings.CommandCsvHeader)
+
+$localServerVersion = (Get-ExchangeServer $env:COMPUTERNAME -ErrorAction:Stop).AdminDisplayVersion
+# This script can run from Exchange 2007 Management shell and above
+if ($localServerVersion.Major -lt $minSupportedVersion) {
+    Write-Error ($LocalizedStrings.LocalServerVersionNotSupported -f $localServerVersion) -ErrorAction:Continue
+    exit
+}
 
 try {
     InitializeExchangeOnlineRemoteSession
@@ -614,7 +627,7 @@ try {
     # During finalization, Public Folders deployment is locked for migration, which means the script cannot invoke
     # Get-PublicFolder as that operation would fail. In that case, the script cannot determine which mail public folder
     # objects are linked to system folders under the NON_IPM_SUBTREE.
-    $lockedForMigration = (Get-OrganizationConfig).PublicFolderMailboxesLockedForNewConnections
+    $lockedForMigration = (Get-OrganizationConfig).PublicFoldersLockedForMigration
     $allSystemFoldersInAD = @()
     if (-not $lockedForMigration) {
         # See https://technet.microsoft.com/en-us/library/bb397221(v=exchg.141).aspx#Trees
@@ -633,7 +646,7 @@ try {
 
     if ($script:verbose) {
         WriteVerboseMessage ($LocalizedStrings.SystemFoldersSkipped -f $script:mailEnabledSystemFolders.Count)
-        $allSystemFoldersInAD | Sort-Object Alias | Format-Table -a | Out-String | Write-Host -ForegroundColor Green -BackgroundColor Black
+        $allSystemFoldersInAD | Sort-Object Alias | Format-Table -AutoSize | Out-String | Write-Host -ForegroundColor Green -BackgroundColor Black
     }
 
     $localFolders = @(Get-MailPublicFolder -ResultSize:Unlimited -IgnoreDefaultScope | Sort-Object Guid)
@@ -723,7 +736,7 @@ try {
                         break
                     }
 
-                    WriteErrorSummary -folder $next -operation $LocalizedStrings.UpdateOperationName -errorMessage ($LocalizedStrings.PrimarySmtpAddressUsedByAnotherFolder -f $local.PrimarySmtpAddress, $local.Guid) -commandText ""
+                    WriteErrorSummary -folder $next -operation $LocalizedStrings.UpdateOperationName -errorMessage ($LocalizedStrings.PrimarySmtpAddressUsedByAnotherFolder -f $local.PrimarySmtpAddress, $local.Guid) -commandtext ""
 
                     # If there were a previous match based on OnPremisesObjectId, remove the folder operation from add and update collections
                     $pendingAdds.Remove($next.Guid)
@@ -738,7 +751,7 @@ try {
                     $pendingUpdates.Remove($local.Guid)
                     $localIndex += $duplicatesFound + 1
 
-                    WriteErrorSummary -folder $local -operation $LocalizedStrings.UpdateOperationName -errorMessage ($LocalizedStrings.PrimarySmtpAddressUsedByOtherFolders -f $local.PrimarySmtpAddress, $duplicatesFound) -commandText ""
+                    WriteErrorSummary -folder $local -operation $LocalizedStrings.UpdateOperationName -errorMessage ($LocalizedStrings.PrimarySmtpAddressUsedByOtherFolders -f $local.PrimarySmtpAddress, $duplicatesFound) -commandtext ""
                     WriteWarningMessage ($LocalizedStrings.SkippingFoldersWithDuplicateAddress -f ($duplicatesFound + 1), $local.PrimarySmtpAddress)
                 } elseif ($pendingUpdates.Contains($local.Guid)) {
                     # If we get here, it means two different remote objects match the same local object (one by OnPremisesObjectId and another by PrimarySmtpAddress).
@@ -747,7 +760,7 @@ try {
                     $pendingUpdates.Remove($local.Guid)
 
                     $errorMessage = ($LocalizedStrings.AmbiguousLocalMailPublicFolderResolution -f $local.Guid, $ambiguousRemoteObj.Guid, $remote.Guid)
-                    WriteErrorSummary -folder $local -operation $LocalizedStrings.UpdateOperationName -errorMessage $errorMessage -commandText ""
+                    WriteErrorSummary -folder $local -operation $LocalizedStrings.UpdateOperationName -errorMessage $errorMessage -commandtext ""
                     WriteWarningMessage $errorMessage
                 } else {
                     # Since there was no match originally using OnPremisesObjectId, the local object was treated as an add to Exchange Online.
@@ -793,10 +806,10 @@ try {
         }
     }
 
-    # Find out the authoritative AcceptedDomains on-premises so that we don't accidentally remove cloud-only email addresses during updates
+    # Find out the authoritative AcceptedDomains on-premises so that we don't accidently remove cloud-only email addresses during updates
     $script:authoritativeDomains = @(Get-AcceptedDomain | Where-Object { $_.DomainType -eq "Authoritative" } | ForEach-Object { $_.DomainName.ToString() })
 
-    # Finally, let's perform the actual operations against Exchange Online
+    # Finally, let's perfom the actual operations against Exchange Online
     $script:itemsProcessed = 0
     for ($i = 0; $i -lt $pendingRemoves.Length; $i++) {
         WriteProgress -statusFormat $LocalizedStrings.ProgressBarStatusRemoving -statusProcessed $i -statusTotal $pendingRemoves.Length

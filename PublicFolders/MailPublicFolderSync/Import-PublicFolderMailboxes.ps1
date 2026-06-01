@@ -25,8 +25,7 @@ param (
 function CreateTenantSession() {
     Import-Module ExchangeOnlineManagement -ErrorAction SilentlyContinue
     if (Get-Module ExchangeOnlineManagement) {
-        $sessionOption = (New-PSSessionOption -SkipCACheck)
-        Connect-ExchangeOnline -Credential $Credential -ConnectionUri $ConnectionUri -PSSessionOption $sessionOption -Prefix "Remote" -ErrorAction SilentlyContinue
+        Connect-ExchangeOnline -Credential $Credential -ConnectionUri $ConnectionUri -Prefix "Remote" -ErrorAction SilentlyContinue
     } else {
         Write-Warning $LocalizedStrings.EXOV2ModuleNotInstalled
         exit
