@@ -99,6 +99,7 @@ nav:
     - ExPerfAnalyzer: Performance/ExPerfAnalyzer.md
     - SimplePerf: Performance/SimplePerf.md
   - PublicFolders:
+    - PublicFolders/index.md
     - MailPublicFolderSync:
       - Import-MailPublicFolders: PublicFolders/MailPublicFolderSync/Import-MailPublicFolders.md
       - Import-PublicFolderMailboxes: PublicFolders/MailPublicFolderSync/Import-PublicFolderMailboxes.md
