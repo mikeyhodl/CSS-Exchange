@@ -187,10 +187,34 @@ end {
 
         if (-not $Mailbox) {
             Write-Host "No mailbox specified. Using the root public folder mailbox."
-            $Mailbox = Get-Mailbox -PublicFolder (Get-OrganizationConfig -ErrorAction Stop).RootPublicFolderMailbox -ErrorAction Stop
+            $rootPublicFolderMailbox = (Get-OrganizationConfig -ErrorAction Stop).RootPublicFolderMailbox
+            $resolvedMailbox = Get-Mailbox -PublicFolder -Identity $rootPublicFolderMailbox -ErrorAction Stop
         } else {
-            $Mailbox = Get-Mailbox -PublicFolder -Identity $Mailbox -ErrorAction Stop
+            $resolvedMailbox = Get-Mailbox -PublicFolder -Identity $Mailbox -ErrorAction Stop
         }
+
+        # Get-Mailbox in ExchangeOnlineManagement returns a Microsoft.Exchange.Data.Directory.Management.Mailbox
+        # whose ToString() returns an empty string. Assigning it back into the [string]-typed $Mailbox
+        # parameter triggers PowerShell coercion that falls back to a property-bag dump
+        # (@{Prop=Val; ...}) when ToString() is empty, and that malformed string breaks downstream
+        # cmdlets. Extract a stable identifier explicitly instead.
+        $mailboxForCmdlet = if ($resolvedMailbox.ExchangeGuid -and $resolvedMailbox.ExchangeGuid.Guid) {
+            $resolvedMailbox.ExchangeGuid.Guid.ToString()
+        } elseif (-not [string]::IsNullOrWhiteSpace([string]$resolvedMailbox.PrimarySmtpAddress)) {
+            [string]$resolvedMailbox.PrimarySmtpAddress
+        } elseif (-not [string]::IsNullOrWhiteSpace([string]$resolvedMailbox.Identity)) {
+            [string]$resolvedMailbox.Identity
+        } else {
+            throw "Resolved public folder mailbox does not expose an ExchangeGuid, PrimarySmtpAddress, or Identity that can be used."
+        }
+
+        $exportedFromValue = if (-not [string]::IsNullOrWhiteSpace([string]$resolvedMailbox.PrimarySmtpAddress)) {
+            [string]$resolvedMailbox.PrimarySmtpAddress
+        } else {
+            $mailboxForCmdlet
+        }
+
+        $Mailbox = $mailboxForCmdlet
 
         if ($foldersToProcess.Count -lt 1) {
             Write-Host "Retrieving all public folders..."
@@ -206,26 +230,38 @@ end {
         $exportBatch = New-Object System.Collections.ArrayList
         $progressCount = 0
 
-        foreach ($folder in $foldersToProcess) {
+        # NOTE: Use $currentFolder (not $folder) as the loop variable. The script parameter
+        # is declared [object[]]$Folder, and PowerShell variable names are case-insensitive,
+        # so assigning to $folder inside the loop re-coerces the iteration value back into
+        # [object[]] - turning a string element into Object[1]{ "<string>" } on every iteration.
+        foreach ($currentFolder in $foldersToProcess) {
             $progressCount++
 
-            if ($folder.Identity -eq "\" -or $folder.Identity -eq "\non_ipm_subtree") {
+            # -Folder accepts public folder objects or identity strings. Resolve string inputs to
+            # full folder objects so the rest of the loop can rely on Identity/EntryId/ContentMailboxName.
+            if ($currentFolder -is [string]) {
+                $currentFolder = Get-PublicFolder -Identity $currentFolder -ErrorAction Stop
+            } elseif ($null -eq $currentFolder.Identity) {
+                throw "Folder input must be a public folder object with an Identity property or a public folder identity string. Received an object of type '$($currentFolder.GetType().FullName)'."
+            }
+
+            if ($currentFolder.Identity -eq "\" -or $currentFolder.Identity -eq "\non_ipm_subtree") {
                 continue
             }
 
-            if ($alreadyExported.Contains($folder.Identity.ToString())) {
+            if ($alreadyExported.Contains($currentFolder.Identity.ToString())) {
                 continue
             }
 
             Write-Progress -Activity "Processing public folders" -Status "Folder $progressCount of $($foldersToProcess.Count)" -PercentComplete (($progressCount / $foldersToProcess.Count) * 100)
 
-            $permissions = Get-PublicFolderClientPermission -Identity "$($folder.Identity)" -Mailbox $mailbox
+            $permissions = Get-PublicFolderClientPermission -Identity "$($currentFolder.Identity)" -Mailbox $mailbox
             foreach ($perm in $permissions) {
                 $exportBatch.Add([PSCustomObject]@{
-                        EntryId            = $folder.EntryId
-                        FolderPath         = $folder.Identity
-                        ContentMailboxName = $folder.ContentMailboxName
-                        ExportedFrom       = $Mailbox.ToString()
+                        EntryId            = $currentFolder.EntryId
+                        FolderPath         = $currentFolder.Identity
+                        ContentMailboxName = $currentFolder.ContentMailboxName
+                        ExportedFrom       = $exportedFromValue
                         DisplayName        = $perm.User.DisplayName
                         PrimarySmtpAddress = $perm.User.RecipientPrincipal.PrimarySmtpAddress
                         Guid               = $perm.User.RecipientPrincipal.Guid
