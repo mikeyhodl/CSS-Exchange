@@ -29,13 +29,13 @@ Describe "Get-URLRewriteRule" {
     Context "Rule extraction from web.config" {
 
         It "Should find inbound rule from Default Web Site web.config" {
-            $siteRules = $Script:result["Default Web Site"]
+            $siteRules = $Script:result.Inbound["Default Web Site"]
             $allRuleNames = @($siteRules.rule.name | Where-Object { $null -ne $_ })
             $allRuleNames | Should -Contain "CVE-2022-41040 Mitigation"
         }
 
         It "Should collect remove entry from MAPI web.config" {
-            $mapiRules = $Script:result["Default Web Site/mapi"]
+            $mapiRules = $Script:result.Inbound["Default Web Site/mapi"]
             # First entry is from web.config which contains the <remove> element
             $removeNames = @($mapiRules[0].remove.name)
             $removeNames | Should -Contain "Global Block Bad User Agents"
@@ -45,13 +45,13 @@ Describe "Get-URLRewriteRule" {
     Context "Rule extraction from applicationHost.config per-location" {
 
         It "Should find disabled inbound rule from appHost Default Web Site location" {
-            $siteRules = $Script:result["Default Web Site"]
+            $siteRules = $Script:result.Inbound["Default Web Site"]
             $allRuleNames = @($siteRules.rule.name | Where-Object { $null -ne $_ })
             $allRuleNames | Should -Contain "Disable HTTP - Redirect to HTTPS"
         }
 
         It "Should preserve disabled attribute on appHost rule" {
-            $siteRules = $Script:result["Default Web Site"]
+            $siteRules = $Script:result.Inbound["Default Web Site"]
             $disabledRule = $siteRules | ForEach-Object { $_.rule } |
                 Where-Object { $_.name -eq "Disable HTTP - Redirect to HTTPS" }
             $disabledRule.enabled | Should -Be "false"
@@ -61,7 +61,7 @@ Describe "Get-URLRewriteRule" {
     Context "Rule extraction from applicationHost.config global section" {
 
         It "Should find global inbound rule" {
-            $siteRules = $Script:result["Default Web Site"]
+            $siteRules = $Script:result.Inbound["Default Web Site"]
             $allRuleNames = @($siteRules.rule.name | Where-Object { $null -ne $_ })
             $allRuleNames | Should -Contain "Global Block Bad User Agents"
         }
@@ -71,15 +71,15 @@ Describe "Get-URLRewriteRule" {
 
         It "Should collect rules from all 3 levels for Default Web Site" {
             # web.config (CVE-2022-41040) + appHost location (disabled HTTPS redirect) + global (Block Bad User Agents)
-            $Script:result["Default Web Site"].Count | Should -Be 3
+            $Script:result.Inbound["Default Web Site"].Count | Should -Be 3
         }
 
         It "Should inherit parent and global rules for Default Web Site/owa" {
-            # OWA web.config has no inbound rules (only outbound which the function cannot see yet)
+            # OWA web.config has no inbound rules (only outbound)
             # OWA appHost location has no inbound rules (only outbound)
             # Walks up to Default Web Site: web.config has CVE-2022-41040, appHost has disabled HTTPS redirect
             # Then global has Block Bad User Agents
-            $owaRules = $Script:result["Default Web Site/owa"]
+            $owaRules = $Script:result.Inbound["Default Web Site/owa"]
             $allRuleNames = @($owaRules.rule.name | Where-Object { $null -ne $_ })
             $allRuleNames | Should -Contain "CVE-2022-41040 Mitigation"
             $allRuleNames | Should -Contain "Disable HTTP - Redirect to HTTPS"
@@ -89,7 +89,7 @@ Describe "Get-URLRewriteRule" {
         It "Should inherit rules for vDir with no rewrite config" {
             # EWS web.config has no rewrite section at all
             # Should inherit from parent Default Web Site and global
-            $ewsRules = $Script:result["Default Web Site/EWS"]
+            $ewsRules = $Script:result.Inbound["Default Web Site/EWS"]
             $allRuleNames = @($ewsRules.rule.name | Where-Object { $null -ne $_ })
             $allRuleNames | Should -Contain "CVE-2022-41040 Mitigation"
             $allRuleNames | Should -Contain "Global Block Bad User Agents"
@@ -102,7 +102,7 @@ Describe "Get-URLRewriteRule" {
             # MAPI web.config has <remove> (collected but no clear)
             # MAPI appHost location has <clear/> which stops inheritance
             # Should NOT contain parent Default Web Site rules or global rules
-            $mapiRules = $Script:result["Default Web Site/mapi"]
+            $mapiRules = $Script:result.Inbound["Default Web Site/mapi"]
             $mapiRules.Count | Should -Be 2
             $allRuleNames = @($mapiRules.rule.name | Where-Object { $null -ne $_ })
             $allRuleNames | Should -Not -Contain "CVE-2022-41040 Mitigation"
@@ -122,14 +122,94 @@ Describe "Get-URLRewriteRule" {
             $result = Get-URLRewriteRule -ApplicationHostConfig $Script:appHost -WebConfigContent $webConfigs
 
             # Should only have 1 entry (the clear node from web.config) - nothing from appHost or parent
-            $result["Default Web Site/owa"].Count | Should -Be 1
-            $null -ne $result["Default Web Site/owa"][0].clear | Should -Be $true
+            $result.Inbound["Default Web Site/owa"].Count | Should -Be 1
+            $null -ne $result.Inbound["Default Web Site/owa"][0].clear | Should -Be $true
+        }
+    }
+
+    Context "Outbound rule extraction from web.config" {
+
+        It "Should find outbound rule from OWA web.config" {
+            $owaOutbound = $Script:result.Outbound["Default Web Site/owa"]
+            $allRuleNames = @($owaOutbound.rule.name | Where-Object { $null -ne $_ })
+            $allRuleNames | Should -Contain "EOMT OWA CSP - outbound"
+        }
+    }
+
+    Context "Outbound rule extraction from applicationHost.config per-location" {
+
+        It "Should find outbound rule from appHost OWA location" {
+            $owaOutbound = $Script:result.Outbound["Default Web Site/owa"]
+            $allRuleNames = @($owaOutbound.rule.name | Where-Object { $null -ne $_ })
+            $allRuleNames | Should -Contain "AppHost OWA Outbound Test"
+        }
+    }
+
+    Context "Outbound rule structure" {
+
+        It "Should preserve preCondition attribute on outbound rule" {
+            $owaOutbound = $Script:result.Outbound["Default Web Site/owa"]
+            $outboundRule = $owaOutbound | ForEach-Object { $_.rule } |
+                Where-Object { $_.name -eq "EOMT OWA CSP - outbound" }
+            $outboundRule.preCondition | Should -Be "EOMT OWA SPA HTML shell - precondition"
+        }
+
+        It "Should have serverVariable on outbound match" {
+            $owaOutbound = $Script:result.Outbound["Default Web Site/owa"]
+            $outboundRule = $owaOutbound | ForEach-Object { $_.rule } |
+                Where-Object { $_.name -eq "EOMT OWA CSP - outbound" }
+            $outboundRule.match.serverVariable | Should -Be "RESPONSE_Content_Security_Policy"
+        }
+    }
+
+    Context "Outbound inheritance and independent clear tracking" {
+
+        It "Should have empty outbound for vDir with no outbound rules at any level" {
+            $ewsOutbound = $Script:result.Outbound["Default Web Site/EWS"]
+            $ewsOutbound.Count | Should -Be 0
+        }
+
+        It "Should continue outbound walk-up when only inbound has clear" {
+            # Inbound clear at child level should not block outbound from inheriting parent rules
+            $childConfig = '<configuration><system.webServer><rewrite><rules><clear /></rules></rewrite></system.webServer></configuration>'
+            $parentConfig = @"
+<configuration><system.webServer><rewrite><outboundRules>
+    <rule name="Parent Outbound Rule">
+        <match serverVariable="RESPONSE_X_Test" pattern="(.*)" />
+        <action type="Rewrite" value="test" />
+    </rule>
+</outboundRules></rewrite></system.webServer></configuration>
+"@
+            [xml]$testAppHost = @"
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <system.webServer />
+    <location path="Default Web Site/test">
+        <system.webServer />
+    </location>
+    <location path="Default Web Site">
+        <system.webServer />
+    </location>
+</configuration>
+"@
+            $webConfigs = @{
+                "Default Web Site/test" = $childConfig
+                "Default Web Site"      = $parentConfig
+            }
+
+            $result = Get-URLRewriteRule -ApplicationHostConfig $testAppHost -WebConfigContent $webConfigs
+
+            # Inbound: should have 1 entry (the clear node) - walk-up stopped
+            $result.Inbound["Default Web Site/test"].Count | Should -Be 1
+            # Outbound: should have inherited from parent - walk-up NOT blocked by inbound clear
+            $outboundNames = @($result.Outbound["Default Web Site/test"].rule.name | Where-Object { $null -ne $_ })
+            $outboundNames | Should -Contain "Parent Outbound Rule"
         }
     }
 
     Context "Empty rewrite sections" {
 
-        It "Should return empty list when no rewrite rules exist at any level" {
+        It "Should return empty lists when no rewrite rules exist at any level" {
             $emptyWebConfig = '<configuration><system.webServer><modules /></system.webServer></configuration>'
             [xml]$emptyAppHost = @"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -146,8 +226,10 @@ Describe "Get-URLRewriteRule" {
 
             $result = Get-URLRewriteRule -ApplicationHostConfig $emptyAppHost -WebConfigContent $webConfigs
 
-            $result.ContainsKey("Default Web Site/test") | Should -Be $true
-            $result["Default Web Site/test"].Count | Should -Be 0
+            $result.Inbound.ContainsKey("Default Web Site/test") | Should -Be $true
+            $result.Inbound["Default Web Site/test"].Count | Should -Be 0
+            $result.Outbound.ContainsKey("Default Web Site/test") | Should -Be $true
+            $result.Outbound["Default Web Site/test"].Count | Should -Be 0
         }
     }
 }

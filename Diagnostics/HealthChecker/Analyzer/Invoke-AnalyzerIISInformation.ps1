@@ -416,10 +416,12 @@ function Invoke-AnalyzerIISInformation {
         WebConfigContent      = $iisWebConfigContent
     }
 
-    $urlRewriteRules = $null
+    $urlRewriteResult = $null
     $ipFilterSettings = $null
     $authTypeSettings = $null
-    Get-URLRewriteRule @ruleParams | Invoke-RemotePipelineHandler -Result ([ref]$urlRewriteRules)
+    Get-URLRewriteRule @ruleParams | Invoke-RemotePipelineHandler -Result ([ref]$urlRewriteResult)
+    $urlRewriteRules = $urlRewriteResult.Inbound
+    $urlOutboundRewriteRules = $urlRewriteResult.Outbound
     Get-IPFilterSetting -ApplicationHostConfig ([xml]$applicationHostConfig) | Invoke-RemotePipelineHandler -Result ([ref]$ipFilterSettings)
     Get-IISAuthenticationType -ApplicationHostConfig ([xml]$applicationHostConfig) | Invoke-RemotePipelineHandler -Result ([ref]$authTypeSettings)
     $failedLocationsForAuth = @()
@@ -440,6 +442,7 @@ function Invoke-AnalyzerIISInformation {
         $epValue = "None"
         $ep = $extendedProtectionConfiguration | Where-Object { $_.VirtualDirectoryName -eq $location.Path }
         $currentRewriteRules = $urlRewriteRules[$location.Path]
+        $currentOutboundRewriteRules = $urlOutboundRewriteRules[$location.Path]
         $authentication = $authTypeSettings[$location.Path]
 
         if ($currentRewriteRules.Count -ne 0) {
@@ -455,7 +458,23 @@ function Invoke-AnalyzerIISInformation {
             }
 
             $displayRewriteRules = ($currentRewriteRules.rule | Where-Object { $_.enabled -ne "false" }).name |
-                Where-Object { $_ -notcontains $excludeRules }
+                Where-Object { $_ -notin $excludeRules }
+        }
+
+        $displayOutboundRewriteRules = [string]::Empty
+
+        if ($currentOutboundRewriteRules.Count -ne 0) {
+            $excludeOutboundRules = @()
+            foreach ($rule in $currentOutboundRewriteRules) {
+                $remove = $rule.Remove
+
+                if ($null -ne $remove) {
+                    $excludeOutboundRules += $remove.Name
+                }
+            }
+
+            $displayOutboundRewriteRules = ($currentOutboundRewriteRules.rule | Where-Object { $_.enabled -ne "false" }).name |
+                Where-Object { $_ -notin $excludeOutboundRules }
         }
 
         if ($null -ne $ep) {
@@ -484,7 +503,8 @@ function Invoke-AnalyzerIISInformation {
                 ExtendedProtection = $epValue
                 SslFlags           = $sslFlag
                 IPFilteringEnabled = $ipFilterEnabled
-                URLRewrite         = $displayRewriteRules
+                InURLRewrite       = $displayRewriteRules
+                OutURLRewrite      = $displayOutboundRewriteRules
                 Authentication     = $authentication
             })
     }
@@ -635,6 +655,7 @@ function Invoke-AnalyzerIISInformation {
                     IndentSpaces  = 8
                 })
             AddHtmlDetailRow = $false
+            TestingName      = "Inbound URL Rewrite Rules"
         }
         Add-AnalyzedResultInformation @params
 
@@ -649,6 +670,54 @@ function Invoke-AnalyzerIISInformation {
 
             Add-AnalyzedResultInformation @params
         }
+    }
+
+    # Display Outbound URL Rewrite Rules.
+    # Same deduplication pattern as inbound - don't display rules on multiple vDirs by same name.
+    $alreadyDisplayedOutboundRules = @{}
+    $outboundDisplayKey = "DisplayKey"
+    $alreadyDisplayedOutboundRules.Add($outboundDisplayKey, (New-Object System.Collections.Generic.List[object]))
+
+    foreach ($key in $urlOutboundRewriteRules.Keys) {
+        $currentSection = $urlOutboundRewriteRules[$key]
+
+        if ($currentSection.Count -ne 0) {
+            foreach ($rule in $currentSection.rule) {
+
+                if ($null -eq $rule) {
+                    Write-Verbose "Outbound rule is NULL skipping."
+                    continue
+                } elseif ($rule.enabled -eq "false") {
+                    Write-Verbose "skipping over disabled outbound rule: $($rule.Name) for vDir '$key'"
+                    continue
+                }
+
+                $displayObject = [PSCustomObject]@{
+                    RewriteRuleName = $rule.name
+                    ServerVariable  = $rule.match.serverVariable
+                    MatchPattern    = $rule.match.pattern
+                    PreCondition    = $rule.preCondition
+                    ActionType      = $rule.action.type
+                }
+
+                if (-not ($alreadyDisplayedOutboundRules.ContainsKey((($displayObject.RewriteRuleName))))) {
+                    $alreadyDisplayedOutboundRules.Add($displayObject.RewriteRuleName, $displayObject)
+                    $alreadyDisplayedOutboundRules[$outboundDisplayKey].Add($displayObject)
+                }
+            }
+        }
+    }
+
+    if ($alreadyDisplayedOutboundRules[$outboundDisplayKey].Count -gt 0) {
+        $params = $baseParams + @{
+            OutColumns       = ([PSCustomObject]@{
+                    DisplayObject = $alreadyDisplayedOutboundRules[$outboundDisplayKey]
+                    IndentSpaces  = 8
+                })
+            AddHtmlDetailRow = $false
+            TestingName      = "Outbound URL Rewrite Rules"
+        }
+        Add-AnalyzedResultInformation @params
     }
 
     foreach ($webApp in $iisWebApplications) {
