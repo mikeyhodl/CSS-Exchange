@@ -13,6 +13,69 @@ Describe "Testing Health Checker by Mock Data Imports" {
         . $PSScriptRoot\HealthCheckerTest.CommonMocks.NotPublished.ps1
     }
 
+    Context "GetHtmlTextValue Unit Tests" {
+
+        It "Should return null for null input" {
+            $result = GetHtmlTextValue -OriginalValue $null
+            $result | Should -BeNullOrEmpty
+        }
+
+        It "Should return empty string for empty input" {
+            $result = GetHtmlTextValue -OriginalValue ""
+            $result | Should -Be ""
+        }
+
+        It "Should return plain text unchanged" {
+            $result = GetHtmlTextValue -OriginalValue "Exchange 2019 CU11"
+            $result | Should -Be "Exchange 2019 CU11"
+        }
+
+        It "Should encode angle brackets for certificate SAN values" {
+            $result = GetHtmlTextValue -OriginalValue "<SAN>CN=mail.contoso.com</SAN>"
+            $result | Should -Be "&lt;SAN&gt;CN=mail.contoso.com&lt;/SAN&gt;"
+        }
+
+        It "Should encode greater-than sign" {
+            $result = GetHtmlTextValue -OriginalValue "Value > 100"
+            $result | Should -Be "Value &gt; 100"
+        }
+
+        It "Should encode less-than sign" {
+            $result = GetHtmlTextValue -OriginalValue "Value < 100"
+            $result | Should -Be "Value &lt; 100"
+        }
+
+        It "Should handle mixed content with angle brackets and normal text" {
+            $result = GetHtmlTextValue -OriginalValue "Status: <Unknown> - Check docs"
+            $result | Should -Be "Status: &lt;Unknown&gt; - Check docs"
+        }
+
+        It "Should preserve intentional br tags after encoding" {
+            $testValue = "CVE-2020-1147<br>CVE-2023-36434<br>"
+            $result = GetHtmlTextValue -OriginalValue $testValue
+            $result | Should -Be "CVE-2020-1147<br>CVE-2023-36434<br>"
+        }
+
+        It "Should convert URLs to clickable hyperlinks" {
+            $result = GetHtmlTextValue -OriginalValue "More Information: https://aka.ms/HC-ExBuilds"
+            # cspell:ignore noopener noreferrer
+            $result | Should -BeLike '*<a href="https://aka.ms/HC-ExBuilds"*>https://aka.ms/HC-ExBuilds</a>'
+        }
+
+        It "Should convert URLs with trailing sentence punctuation" {
+            $result = GetHtmlTextValue -OriginalValue "See: https://portal.msrc.microsoft.com/security-guidance/advisory/CVE-2020-1147 for more information."
+            $result | Should -BeLike '*<a href=*>https://portal.msrc.microsoft.com/security-guidance/advisory/CVE-2020-1147</a> for more information.'
+        }
+
+        It "Should handle br tags combined with URLs in security vulnerability summary" {
+            $testValue = "CVE-2020-1147`r`n`t`tSee: https://portal.msrc.microsoft.com/security-guidance/advisory/CVE-2020-1147 for more information.<br>"
+            $result = GetHtmlTextValue -OriginalValue $testValue
+            $result | Should -BeLike "*<br>*"
+            $result | Should -Not -BeLike "*&lt;br&gt;*"
+            $result | Should -BeLike "*<a href=*>*</a>*"
+        }
+    }
+
     Context "Basic Exchange 2019 CU11 Testing HyperV" {
         BeforeAll {
             SetDefaultRunOfHealthChecker "Debug_HyperV_Results.xml"
@@ -173,6 +236,80 @@ Describe "Testing Health Checker by Mock Data Imports" {
             SetActiveDisplayGrouping "Exchange IIS Information"
             $tokenCacheModuleInformation = GetObject "TokenCacheModule loaded"
             $tokenCacheModuleInformation | Should -Be $null # null because we are loaded and only display if we aren't loaded.
+        }
+
+        It "HTML Report - HtmlServerValues Structure" {
+            $Script:results.HtmlServerValues.ContainsKey("ServerDetails") | Should -Be $true
+            $Script:results.HtmlServerValues.ContainsKey("OverviewValues") | Should -Be $true
+            $Script:results.HtmlServerValues["ServerDetails"].Count | Should -BeGreaterThan 0
+            $Script:results.HtmlServerValues["OverviewValues"].Count | Should -BeGreaterThan 0
+
+            $firstDetail = $Script:results.HtmlServerValues["ServerDetails"][0]
+            $firstDetail.PSObject.Properties.Name | Should -Contain "Name"
+            $firstDetail.PSObject.Properties.Name | Should -Contain "DetailValue"
+            $firstDetail.PSObject.Properties.Name | Should -Contain "TableValue"
+            $firstDetail.PSObject.Properties.Name | Should -Contain "Class"
+
+            $firstOverview = $Script:results.HtmlServerValues["OverviewValues"][0]
+            $firstOverview.PSObject.Properties.Name | Should -Contain "Name"
+            $firstOverview.PSObject.Properties.Name | Should -Contain "DetailValue"
+
+            # ServerDetails captures most entries while OverviewValues is selective
+            $Script:results.HtmlServerValues["ServerDetails"].Count |
+                Should -BeGreaterThan $Script:results.HtmlServerValues["OverviewValues"].Count
+        }
+
+        It "HTML Report - Overview Values" {
+            $serverName = GetHtmlOverviewValue "Server Name"
+            $serverName | Should -Not -BeNullOrEmpty
+            $serverName.DetailValue | Should -Not -BeNullOrEmpty
+
+            $exchangeVersion = GetHtmlOverviewValue "Exchange Version"
+            $exchangeVersion | Should -Not -BeNullOrEmpty
+            $exchangeVersion.DetailValue | Should -Not -BeNullOrEmpty
+
+            $generationTime = GetHtmlOverviewValue "Generation Time"
+            $generationTime | Should -Not -BeNullOrEmpty
+
+            $vulnDetected = GetHtmlOverviewValue "Vulnerability Detected"
+            $vulnDetected | Should -Not -BeNullOrEmpty
+            if ($vulnDetected.DetailValue -ne "None") {
+                $vulnDetected.Class | Should -Be "Red"
+            }
+        }
+
+        It "HTML Report - ServerDetails CSS Class Mapping" {
+            # Grey write type → empty Class
+            $serverName = GetHtmlServerDetail "Server Name"
+            $serverName | Should -Not -BeNullOrEmpty
+            $serverName.Class | Should -BeNullOrEmpty
+
+            # Yellow write type → Yellow Class
+            $edition = GetHtmlServerDetail "Edition"
+            if ($null -ne $edition) {
+                $edition.Class | Should -Be "Yellow"
+            }
+        }
+
+        It "HTML Report - Security Vulnerabilities HTML Rendering" {
+            # Individual "Security Vulnerability" entries should NOT appear in ServerDetails.
+            # They are rolled up into the "Security Vulnerabilities" summary row.
+            # The regular CVE path sets AddHtmlDetailRow = $false, but the override CVE path
+            # in Invoke-AnalyzerSecurityCveAndOverrideCheck.ps1 is missing it.
+            $individualCveEntries = $Script:results.HtmlServerValues["ServerDetails"] |
+                Where-Object { $_.Name -eq "Security Vulnerability" }
+            $individualCveEntries | Should -BeNullOrEmpty
+
+            # The summary row should be present
+            $entry = GetHtmlServerDetail "Security Vulnerabilities"
+            $entry | Should -Not -BeNullOrEmpty
+
+            if ($null -ne $entry -and -not [string]::IsNullOrEmpty($entry.DetailValue)) {
+                $entry.DetailValue | Should -BeLike "*CVE-*"
+                # Validates the fix for the PR #2475 regression: <br> tags must be preserved
+                $entry.DetailValue | Should -Not -BeLike "*&lt;br&gt;*"
+                $entry.DetailValue | Should -BeLike "*<br>*"
+            }
         }
     }
 
