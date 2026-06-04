@@ -720,6 +720,20 @@ function Invoke-AnalyzerIISInformation {
         Add-AnalyzedResultInformation @params
     }
 
+    $globalRules = ([xml]$applicationHostConfig).configuration.'system.webServer'.rewrite.globalRules
+
+    if ($null -ne $globalRules -and
+        $null -ne $globalRules.rule) {
+        $params = $baseParams + @{
+            Name             = "Global IIS Rewrite Rules Detected"
+            Details          = "Global URL Rewrite rules are defined in applicationHost.config and apply to all sites on this server." +
+            "`r`n`t`tReview these rules to ensure they are expected and not interfering with Exchange traffic."
+            DisplayWriteType = "Yellow"
+            TestingName      = "Global IIS Rewrite Rules"
+        }
+        Add-AnalyzedResultInformation @params
+    }
+
     foreach ($webApp in $iisWebApplications) {
         if ($correctLocations.ContainsKey($webApp.FriendlyName)) {
             if ($webApp.PhysicalPath -notlike "*$($correctLocations[$webApp.FriendlyName])") {

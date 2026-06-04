@@ -187,6 +187,10 @@ Describe "Testing Health Checker by Mock Data Imports" {
             $outboundRuleNames = $outboundRules.RewriteRuleName.Value
             $outboundRuleNames | Should -Contain "EOMT OWA CSP - outbound"
             $outboundRuleNames | Should -Contain "AppHost OWA Outbound Test"
+
+            # Verify global IIS rewrite rules warning is displayed
+            $globalRulesWarning = GetObject "Global IIS Rewrite Rules"
+            $globalRulesWarning | Should -Not -BeNullOrEmpty
         }
     }
 
