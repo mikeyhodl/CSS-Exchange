@@ -244,6 +244,9 @@ Describe "Testing Health Checker by Mock Data Imports" {
             $inboundRuleNames | Should -Contain "CVE-2022-41040 Mitigation"
             $inboundRuleNames | Should -Contain "Global Block Bad User Agents"
 
+            # Verify rules excluded by <remove> in DWS web.config do not appear in detailed display
+            $inboundRuleNames | Should -Not -Contain "AppHost Only Rule"
+
             # Verify outbound URL rewrite rules are displayed (deduplicated across vDirs)
             $outboundRules = GetObject "Outbound URL Rewrite Rules"
             $outboundRules.Count | Should -Be 2

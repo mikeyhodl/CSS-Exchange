@@ -612,6 +612,14 @@ function Invoke-AnalyzerIISInformation {
         $currentSection = $urlRewriteRules[$key]
 
         if ($currentSection.Count -ne 0) {
+            # Collect <remove> entries so inherited rules that are removed at a lower level are excluded.
+            $excludeRules = @()
+            foreach ($section in $currentSection) {
+                if ($null -ne $section.Remove) {
+                    $excludeRules += $section.Remove.Name
+                }
+            }
+
             foreach ($rule in $currentSection.rule) {
 
                 if ($null -eq $rule) {
@@ -620,6 +628,9 @@ function Invoke-AnalyzerIISInformation {
                 } elseif ($rule.enabled -eq "false") {
                     # skip over disabled rules.
                     Write-Verbose "skipping over disabled rule: $($rule.Name) for vDir '$key'"
+                    continue
+                } elseif ($rule.Name -in $excludeRules) {
+                    Write-Verbose "skipping removed rule: $($rule.Name) for vDir '$key'"
                     continue
                 }
 
@@ -682,6 +693,13 @@ function Invoke-AnalyzerIISInformation {
         $currentSection = $urlOutboundRewriteRules[$key]
 
         if ($currentSection.Count -ne 0) {
+            $excludeOutboundRules = @()
+            foreach ($section in $currentSection) {
+                if ($null -ne $section.Remove) {
+                    $excludeOutboundRules += $section.Remove.Name
+                }
+            }
+
             foreach ($rule in $currentSection.rule) {
 
                 if ($null -eq $rule) {
@@ -689,6 +707,9 @@ function Invoke-AnalyzerIISInformation {
                     continue
                 } elseif ($rule.enabled -eq "false") {
                     Write-Verbose "skipping over disabled outbound rule: $($rule.Name) for vDir '$key'"
+                    continue
+                } elseif ($rule.Name -in $excludeOutboundRules) {
+                    Write-Verbose "skipping removed outbound rule: $($rule.Name) for vDir '$key'"
                     continue
                 }
 
