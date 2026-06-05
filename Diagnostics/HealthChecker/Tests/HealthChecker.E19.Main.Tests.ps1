@@ -236,6 +236,24 @@ Describe "Testing Health Checker by Mock Data Imports" {
             SetActiveDisplayGrouping "Exchange IIS Information"
             $tokenCacheModuleInformation = GetObject "TokenCacheModule loaded"
             $tokenCacheModuleInformation | Should -Be $null # null because we are loaded and only display if we aren't loaded.
+
+            # Verify inbound URL rewrite rules are displayed (deduplicated across vDirs)
+            $inboundRules = GetObject "Inbound URL Rewrite Rules"
+            $inboundRules.Count | Should -Be 2
+            $inboundRuleNames = $inboundRules.RewriteRuleName.Value
+            $inboundRuleNames | Should -Contain "CVE-2022-41040 Mitigation"
+            $inboundRuleNames | Should -Contain "Global Block Bad User Agents"
+
+            # Verify outbound URL rewrite rules are displayed (deduplicated across vDirs)
+            $outboundRules = GetObject "Outbound URL Rewrite Rules"
+            $outboundRules.Count | Should -Be 2
+            $outboundRuleNames = $outboundRules.RewriteRuleName.Value
+            $outboundRuleNames | Should -Contain "EOMT OWA CSP - outbound"
+            $outboundRuleNames | Should -Contain "AppHost OWA Outbound Test"
+
+            # Verify global IIS rewrite rules warning is displayed
+            $globalRulesWarning = GetObject "Global IIS Rewrite Rules"
+            $globalRulesWarning | Should -Not -BeNullOrEmpty
         }
 
         It "HTML Report - HtmlServerValues Structure" {
