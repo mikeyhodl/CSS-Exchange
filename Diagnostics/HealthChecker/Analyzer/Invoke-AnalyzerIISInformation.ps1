@@ -635,9 +635,18 @@ function Invoke-AnalyzerIISInformation {
                 }
 
                 #multiple match type possibilities, but should only be one per rule.
-                $propertyType = ($rule.match | Get-Member | Where-Object { $_.MemberType -eq "Property" }).Name
-                $isUrlMatchProblem = $propertyType -eq "url" -and $rule.match.$propertyType -eq "*"
-                $matchProperty = "$propertyType - $($rule.match.$propertyType)"
+                $allProperties = @(($rule.match | Get-Member | Where-Object { $_.MemberType -eq "Property" }).Name)
+                # When <match> has extra attributes (negate, ignoreCase), Get-Member returns multiple properties.
+                # Filter to the actual match target property for display and the URL Match Problem check.
+                $propertyType = ($allProperties | Where-Object { $_ -eq "url" -or $_ -eq "serverVariable" } | Select-Object -First 1)
+
+                if ($null -eq $propertyType) {
+                    $propertyType = $allProperties | Select-Object -First 1
+                }
+
+                $matchValue = $rule.match.$propertyType
+                $isUrlMatchProblem = $propertyType -eq "url" -and $matchValue -eq "*"
+                $matchProperty = "$propertyType - $matchValue"
 
                 $displayObject = [PSCustomObject]@{
                     RewriteRuleName = $rule.name
