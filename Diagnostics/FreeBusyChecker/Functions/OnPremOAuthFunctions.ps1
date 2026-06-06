@@ -165,7 +165,7 @@ function PartnerApplicationCheck {
         $Script:tdPartnerApplicationRealm = "Should be Blank"
     }
     Write-Host -ForegroundColor White " LinkedAccount: "
-    if ($PartnerApplication.LinkedAccount -like "$exchangeOnPremDomain/Users/Exchange Online-ApplicationAccount" -or $PartnerApplication.LinkedAccount -like "$Script:ExchangeOnPremLocalDomain/Users/Exchange Online-ApplicationAccount"  ) {
+    if ($PartnerApplication.LinkedAccount -like "$Script:ExchangeOnPremDomain/Users/Exchange Online-ApplicationAccount" -or $PartnerApplication.LinkedAccount -like "$Script:ExchangeOnPremLocalDomain/Users/Exchange Online-ApplicationAccount"  ) {
         Write-Host -ForegroundColor Green " " $PartnerApplication.LinkedAccount
         $Script:tdPartnerApplicationLinkedAccountColor = "green"
     } else {

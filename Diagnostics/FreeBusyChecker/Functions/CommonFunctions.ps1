@@ -4,7 +4,7 @@ function Test-ExchangeOnlineConnection {
     Write-Host -ForegroundColor Green " Checking Exchange Online Configuration"
     Write-Host " Testing Connection to Exchange Online with EO Prefix."
     try {
-        $CheckExoMailbox = get-EOMailbox $Script:UserOnline -ErrorAction Stop
+        $CheckExoMailbox = Get-EOMailbox $Script:UserOnline -ErrorAction Stop
         if ($null -ne $CheckExoMailbox) {
             return $true
         } else {

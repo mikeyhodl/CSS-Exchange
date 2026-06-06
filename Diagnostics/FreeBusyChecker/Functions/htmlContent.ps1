@@ -103,11 +103,11 @@ margin-right: 1%;
             </li>
             <li>
               <p>Exchange On Premises Domain:</p>
-              <span style='color:green; font-weight:500; padding-left:2%'>$exchangeOnPremDomain</span>
+              <span style='color:green; font-weight:500; padding-left:2%'>$Script:ExchangeOnPremDomain</span>
             </li>
             <li>
               <p>Exchange On Premises External EWS url:</p>
-              <span style='color:green; font-weight:500; padding-left:2%'>$exchangeOnPremEWS</span>
+              <span style='color:green; font-weight:500; padding-left:2%'>$Script:ExchangeOnPremEWS</span>
             </li>
             <li>
               <p>On Premises Hybrid Mailbox:</p>
@@ -173,7 +173,7 @@ function FedInfoHtml() {
 <th ColSpan='2' style='color:white;'>Summary - Get-FederationInformation</th>
 </tr>
 <tr>
-<td><b>Get-FederationInformation -Domain $ExchangeOnPremDomain</b></td>
+<td><b>Get-FederationInformation -Domain $Script:ExchangeOnPremDomain</b></td>
 <td>
   <div> <b>Domain Names: </b> <span style='color:$tdDomainNamesColor'>$tdDomainNamesFL</span></div>
   <div> <b>TokenIssuerUris: </b> <span style='color:$tdTokenIssuerUrisColor'>$tdTokenIssuerUrisFL</span></div>
@@ -538,13 +538,13 @@ function AvailabilityAddressSpaceCheckOAuth() {
         $Script:tdAvailabilityAddressSpaceAccessMethodColor = "red"
     }
     Write-Host -ForegroundColor White " ProxyUrl: "
-    if ($AvailabilityAddressSpace.ProxyUrl -like $exchangeOnPremEWS) {
+    if ($AvailabilityAddressSpace.ProxyUrl -like $Script:ExchangeOnPremEWS) {
         Write-Host -ForegroundColor Green " "$AvailabilityAddressSpace.ProxyUrl
         $Script:tdAvailabilityAddressSpaceProxyUrl = $AvailabilityAddressSpace.ProxyUrl
         $Script:tdAvailabilityAddressSpaceProxyUrlColor = "green"
     } else {
         Write-Host -ForegroundColor Red "  ProxyUrl is NOT correct. "
-        Write-Host -ForegroundColor White "  Should be $exchangeOnPremEWS"
+        Write-Host -ForegroundColor White "  Should be $Script:ExchangeOnPremEWS"
         $Script:tdAvailabilityAddressSpaceProxyUrl = $AvailabilityAddressSpace.ProxyUrl
         $Script:tdAvailabilityAddressSpaceProxyUrlColor = "red"
     }
@@ -653,7 +653,7 @@ function ExoOrgRelCheckHtml() {
 <th ColSpan='2' style='color:white;'>Summary - Get-OrganizationRelationship</th>
 </tr>
 <tr>
-<td><b>  Get-OrganizationRelationship  | Where{($_.DomainNames -like $ExchangeOnPremDomain )} | Select Identity,DomainNames,FreeBusy*,TarGet*,Enabled</b></td>
+<td><b>  Get-OrganizationRelationship  | Where{($_.DomainNames -like $Script:ExchangeOnPremDomain )} | Select Identity,DomainNames,FreeBusy*,TarGet*,Enabled</b></td>
 <td>
   <div><b>Domain Names:</b><span >$($Script:tdExoOrgRelDomainNamesData)</span></div>
   <div><b>FreeBusyAccessEnabled:</b><span style='color:$Script:tdExoOrgRelFreeBusyAccessEnabledColor'>$($Script:tdExoOrgRelFreeBusyAccessEnabled)</span></div>
