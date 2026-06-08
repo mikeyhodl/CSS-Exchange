@@ -48,7 +48,7 @@ $BuildVersion = ""
 # Force TLS1.2 to make sure we can download from HTTPS
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-. $PSScriptRoot\..\..\Shared\Show-Disclaimer.ps1
+. $PSScriptRoot\..\..\..\Shared\Show-Disclaimer.ps1
 
 function Test-ExchangeMitigationRequired {
     param()

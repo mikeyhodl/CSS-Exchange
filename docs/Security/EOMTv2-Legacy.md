@@ -1,10 +1,14 @@
-# Exchange On-premises Mitigation Tool v2 (EOMTv2)
+# Exchange On-premises Mitigation Tool v2 (EOMTv2) — Legacy
+
+!!! warning "LEGACY — This script has been replaced"
+
+      This script has been replaced by the unified [Exchange On-premises Mitigation Tool (EOMT)](EOMT.md), which supports multiple CVEs including CVE-2022-41040, JSON-backed rollback, and remote execution. Please use the new EOMT for all current and future mitigations. This page is retained for historical reference only.
 
 !!! warning "Please read carefully"
 
       The vulnerability addressed by this mitigation script has been addressed in [latest Exchange Server Security Updates](https://aka.ms/LatestExchangeServerUpdate) (starting with November 2022 SU). Mitigations can become insufficient to protect against all variations of an attack. Thus, installation of an applicable SU is the only way to protect your servers. Once you install the updates, you can rollback the mitigation as described in the [Exchange On-premises Mitigation Tool v2 Examples](#exchange-on-premises-mitigation-tool-v2-examples) section.
 
-Download the latest release: [EOMTv2.ps1](https://github.com/microsoft/CSS-Exchange/releases/latest/download/EOMTv2.ps1)
+Download the latest release: [EOMTv2-Legacy.ps1](https://github.com/microsoft/CSS-Exchange/releases/latest/download/EOMTv2-Legacy.ps1)
 
 The Exchange On-premises Mitigation Tool v2 script (EOMTv2.ps1) can be used to mitigate **CVE-2022-41040**. This script does the following:
 

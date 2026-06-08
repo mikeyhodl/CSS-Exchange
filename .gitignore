@@ -1,2 +1,7 @@
 dist
 .DS_Store
+
+# Personal Copilot/AI overrides (per-developer, not shared)
+.copilot/
+.claude/
+.agents/
