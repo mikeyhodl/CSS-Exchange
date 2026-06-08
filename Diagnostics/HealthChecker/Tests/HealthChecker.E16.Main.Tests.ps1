@@ -58,8 +58,8 @@ Describe "Testing Health Checker by Mock Data Imports - Exchange 2016" {
             TestObjectMatch "Power Plan" "Balanced --- Error"-WriteType "Red"
             $httpProxy = GetObject "Http Proxy Setting"
             $httpProxy.ProxyAddress | Should -Be "None"
-            TestObjectMatch "Visual C++ 2012 x64" "Redistributable (11.0.50727) is outdated" -WriteType "Yellow"
-            TestObjectMatch "Visual C++ 2013 x64" "Redistributable (12.0.21005) is outdated" -WriteType "Yellow"
+            TestObjectMatch "Visual C++ 2012 x64" "Redistributable is outdated (11.0.50727). Update the Visual C++ 2012 version." -WriteType "Yellow"
+            TestObjectMatch "Visual C++ 2013 x64" "Redistributable is outdated (12.0.21005). Update the Visual C++ 2013 version." -WriteType "Yellow"
             TestObjectMatch "Server Pending Reboot" $false
 
             $pageFile = GetObject "PageFile Size 0"

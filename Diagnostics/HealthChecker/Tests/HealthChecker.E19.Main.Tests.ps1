@@ -127,7 +127,7 @@ Describe "Testing Health Checker by Mock Data Imports" {
             $httpProxy = GetObject "Http Proxy Setting"
             $httpProxy.ProxyAddress | Should -Be "None"
             TestObjectMatch "Visual C++ 2012 x64" "11.0.61030 Version is current" -WriteType "Green"
-            TestObjectMatch "Visual C++ 2013 x64" "Redistributable (12.0.21005) is outdated" -WriteType "Yellow"
+            TestObjectMatch "Visual C++ 2013 x64" "Redistributable is outdated (12.0.21005). Update the Visual C++ 2013 version." -WriteType "Yellow"
             TestObjectMatch "Server Pending Reboot" $false
 
             $pageFile = GetObject "PageFile Size 0"
