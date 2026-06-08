@@ -239,10 +239,18 @@ Describe "Testing Health Checker by Mock Data Imports" {
 
             # Verify inbound URL rewrite rules are displayed (deduplicated across vDirs)
             $inboundRules = GetObject "Inbound URL Rewrite Rules"
-            $inboundRules.Count | Should -Be 2
+            $inboundRules.Count | Should -Be 3
             $inboundRuleNames = $inboundRules.RewriteRuleName.Value
             $inboundRuleNames | Should -Contain "CVE-2022-41040 Mitigation"
             $inboundRuleNames | Should -Contain "Global Block Bad User Agents"
+            $inboundRuleNames | Should -Contain "Negate Match Test Rule"
+
+            # Verify rules excluded by <remove> in DWS web.config do not appear in detailed display
+            $inboundRuleNames | Should -Not -Contain "AppHost Only Rule"
+
+            # Verify match property resolves correctly when <match> has extra attributes like negate
+            $negateRule = $inboundRules | Where-Object { $_.RewriteRuleName.Value -eq "Negate Match Test Rule" }
+            $negateRule.MatchProperty.Value | Should -Be "url - .*"
 
             # Verify outbound URL rewrite rules are displayed (deduplicated across vDirs)
             $outboundRules = GetObject "Outbound URL Rewrite Rules"

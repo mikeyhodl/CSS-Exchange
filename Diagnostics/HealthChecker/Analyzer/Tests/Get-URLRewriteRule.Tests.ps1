@@ -96,6 +96,32 @@ Describe "Get-URLRewriteRule" {
         }
     }
 
+    Context "AppHost-only locations (no web.config entry)" {
+
+        It "Should process Proxy location that only exists in appHost" {
+            # EAS/Proxy exists in applicationHost.config but is not returned by Get-WebApplication
+            # so it has no entry in $webConfigContent. The fix adds it from appHost locations.
+            $Script:result.Inbound.ContainsKey("Default Web Site/Microsoft-Server-ActiveSync/Proxy") | Should -Be $true
+            $Script:result.Outbound.ContainsKey("Default Web Site/Microsoft-Server-ActiveSync/Proxy") | Should -Be $true
+        }
+
+        It "Should inherit parent rules for appHost-only Proxy location" {
+            # Proxy has no rules at its own appHost level. Walk-up should reach DWS web.config
+            # (CVE-2022-41040) and DWS appHost (disabled HTTPS redirect, AppHost Only Rule) and global.
+            $proxyRules = $Script:result.Inbound["Default Web Site/Microsoft-Server-ActiveSync/Proxy"]
+            $proxyRuleNames = @($proxyRules.rule.name | Where-Object { $null -ne $_ })
+            $proxyRuleNames | Should -Contain "CVE-2022-41040 Mitigation"
+            $proxyRuleNames | Should -Contain "Global Block Bad User Agents"
+        }
+
+        It "Should not duplicate keys that exist in both WebConfigContent and appHost" {
+            # "Default Web Site" exists in both $webConfigContent and appHost locations.
+            # It should appear exactly once in the result, not duplicated.
+            $dwsCount = @($Script:result.Inbound.Keys | Where-Object { $_ -eq "Default Web Site" }).Count
+            $dwsCount | Should -Be 1
+        }
+    }
+
     Context "Clear stops inheritance" {
 
         It "Should stop at clear in appHost location for Default Web Site/mapi" {

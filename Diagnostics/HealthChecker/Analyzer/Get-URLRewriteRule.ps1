@@ -37,7 +37,21 @@ function Get-URLRewriteRule {
         $appHostConfigLocations = $ApplicationHostConfig.configuration.Location.path
     }
     process {
-        foreach ($key in $WebConfigContent.Keys) {
+        # Build combined location list: WebConfigContent keys + appHost-only locations.
+        # Some IIS locations (e.g., EAS/Proxy) exist only in applicationHost.config and have
+        # no web.config entry from Get-WebApplication. We still need to walk up inheritance for them.
+        $allLocations = [System.Collections.Generic.List[string]]::new()
+        foreach ($wcKey in $WebConfigContent.Keys) {
+            $allLocations.Add($wcKey)
+        }
+        foreach ($appHostPath in $appHostConfigLocations) {
+            if (-not [string]::IsNullOrEmpty($appHostPath) -and
+                -not $WebConfigContent.ContainsKey($appHostPath)) {
+                $allLocations.Add($appHostPath)
+            }
+        }
+
+        foreach ($key in $allLocations) {
             Write-Verbose "Working on key: $key"
             $continue = $true
             $clearInbound = $false
