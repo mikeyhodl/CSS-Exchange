@@ -142,7 +142,7 @@ function WriteLog {
         [ValidateNotNullOrEmpty()]
         [string]$Message,
 
-        # Logfile location
+        # Log file location
         [Parameter(Mandatory=$false)]
         [string]$Path="C:\Logs\",
 
@@ -193,13 +193,13 @@ function WriteLog {
     "[$Date] [$LevelText] $Message" | Out-File -FilePath $Path -Append
 }
 
-# Function to retry a specific scriptblock
+# Function to retry a specific ScriptBlock
 function ExecuteWithRetries {
     param(
 
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
-        [scriptblock] $ScriptToRetry,
+        [ScriptBlock] $ScriptToRetry,
 
         [Parameter(Mandatory=$true)]
         [array] $ArgumentList,
@@ -427,7 +427,7 @@ try {
     # Exporting public folder Permissions to default backup location
     $accessRightsToExport = @()
     foreach ($accessRightItem in $accessRights) {
-        $row = New-Object psobject -Property @{
+        $row = New-Object PSObject -Property @{
             Identity           = [string] $accessRightItem.Identity
             User               = [string] $accessRightItem.User
             AccessRights       = [string] $accessRightItem.AccessRights
@@ -467,7 +467,7 @@ try {
             # group's primary smtp address.
             $pfEmailIds = $pfEmailIds | ForEach-Object { "smtp:" + ([string]$_).Split(":")[1] }
             if ($isE14OnPrem) {
-                # We can't set the externalEmailAddress for mail-enabled publicfolder in E14
+                # We can't set the externalEmailAddress for mail-enabled public folder in E14
                 $extEmailAddr = $null
             }
 
@@ -552,7 +552,7 @@ try {
             $sendAsAddedByScript         = $null
         }
 
-        $row = New-Object psobject -Property @{
+        $row = New-Object PSObject -Property @{
             Identity                    = $pfToGrpMappingItem.FolderPath
             EmailAddresses              = $pfEmailIds -join " "
             UnifiedGroup                = $pfToGrpMappingItem.TargetGroupMailbox

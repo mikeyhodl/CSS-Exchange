@@ -9,7 +9,7 @@ Move-PublicFolderBranch.ps1
   [-FolderRoot] <String>
   [-TargetPublicFolderMailbox] <String>
   [-OrganizationName <String>]
-  [-Whatif]
+  [-WhatIf]
   [<CommonParameters>]
 ```
 

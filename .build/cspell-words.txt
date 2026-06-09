@@ -41,6 +41,8 @@ Eventlog
 evtx
 Exchweb
 exfiltration
+exopf
+exov
 fabrikam
 FIPFS
 fips
@@ -81,6 +83,7 @@ ldifde
 Liant
 Linq
 LOCALAPPDATA
+lockdown
 logman
 lsass
 Lync
@@ -89,6 +92,9 @@ Mbps
 mbxs
 Mddhhmm
 Mddhhmmss
+mepf
+mepfdns
+mepfs
 meso
 mesos
 mfcmapi
@@ -151,6 +157,7 @@ Sids
 Snapin
 SPDLT
 STMP
+subfolders
 syncall
 tcpip
 TDSDSA
@@ -159,6 +166,7 @@ UCMA
 unconfigured
 unrequired
 USERDNSDOMAIN
+validatemepf
 Vianet
 Visio
 vmxnet

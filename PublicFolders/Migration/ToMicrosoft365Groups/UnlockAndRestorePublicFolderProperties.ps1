@@ -119,7 +119,7 @@ function WriteLog {
         [ValidateNotNullOrEmpty()]
         [string]$Message,
 
-        # Logfile location
+        # Log file location
         [Parameter(Mandatory=$false)]
         [string]$Path="C:\Logs\",
 
@@ -170,13 +170,13 @@ function WriteLog {
     "[$Date] [$LevelText] $Message" | Out-File -FilePath $Path -Append
 }
 
-# Function to retry a specific scriptblock
+# Function to retry a specific ScriptBlock
 function ExecuteWithRetries {
     param(
 
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
-        [scriptblock] $ScriptToRetry,
+        [ScriptBlock] $ScriptToRetry,
 
         [Parameter(Mandatory=$true)]
         [array] $ArgumentList,

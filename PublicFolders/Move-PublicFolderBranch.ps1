@@ -26,7 +26,7 @@ param(
     [string] $OrganizationName,
 
     [Parameter(Mandatory=$false)]
-    [switch] $Whatif
+    [switch] $WhatIf
 )
 
 ################ START OF DEFAULTS ################
@@ -41,7 +41,7 @@ FeasibilityToMove = Checking if it is possible to move contents to the given tar
 FeasibilityToMerge = Checking if it is possible to merge the given source mailbox
 SplitSizeInformation = Minimum percentage to split is {0} while percentage occupied by source mailbox is {1}.
 ImpossibleToSplit = Public folder mailbox {0} cannot be split at this point.
-ImpossibleToMove = Public folder mailbox {0} is not the right candidate to accomodate the moving contents.
+ImpossibleToMove = Public folder mailbox {0} is not the right candidate to accommodate the moving contents.
 ImpossibleToMerge = Public folder mailbox {0} cannot be merged at this point.
 RetrieveFoldersFromSourceMailbox = Determining folders that belong to source mailbox
 NotEnoughFoldersToSplit = There aren't enough folders residing in the mailbox {0} to split.
@@ -96,7 +96,7 @@ Write-Host
 Write-Host "[$($(Get-Date).ToString())]" $PublicFolderManagement_LocalizedStrings.MoveFolders
 $script:FoldersToMove | Format-Wide -Property MapiFolderPath -Column 1
 
-if ($Whatif) {
+if ($WhatIf) {
     exit
 }
 

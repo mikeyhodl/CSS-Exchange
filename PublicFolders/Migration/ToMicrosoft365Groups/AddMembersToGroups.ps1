@@ -9,7 +9,7 @@
 # .DESCRIPTION
 #    1. It reads the permission entries from the backup file stored during lock down if public folders are locked, else uses 'Get-PublicFolderClientPermission' to get the permissions.
 #    2. It adds the users with permission roles, "Owner, PublishingEditor, Editor, PublishingAuthor, Author" as members to the group
-#    3. It also adds users having atleast "ReadItems, CreateItems, FolderVisible, EditOwnedItems, DeleteOwnedItems" access rights as members to the corresponding group.
+#    3. It also adds users having at least "ReadItems, CreateItems, FolderVisible, EditOwnedItems, DeleteOwnedItems" access rights as members to the corresponding group.
 #    4. It adds the users with permission role, "Owner" as owners to the group.
 #    5. It throws a warning when the default permission is Author and above, suggesting the user to make the group 'public'.
 #
@@ -141,7 +141,7 @@ function AddUserToList() {
 function ValidateAndAddRemoteUserToList() {
     param ([string]$user, [string]$smtpAddress, [string]$userType, [string]$accessRight)
 
-    # Using smtp address for uniqueness as "Name" will not be unique accross on-premises and exchange online
+    # Using smtp address for uniqueness as "Name" will not be unique across on-premises and exchange online
     $recipient = Get-RemoteRecipient $smtpAddress -ErrorAction SilentlyContinue | Where-Object { $_.PrimarySmtpAddress -like $smtpAddress } | Select-Object RecipientType
 
     if ($recipient) {
@@ -239,7 +239,7 @@ function WriteLog {
         [ValidateNotNullOrEmpty()]
         [string]$Message,
 
-        # Logfile location
+        # Log file location
         [Parameter(Mandatory=$false)]
         [string]$Path="C:\Logs\",
 
@@ -419,9 +419,9 @@ try {
         $permissionEntries = $PermissionList | Where-Object { [string]$_.Identity -eq $pfIdentity }
         if (!$permissionEntries) {
             if ($ArePublicFoldersLocked) {
-                WriteLog -Path $logPath -Level Error -Message ($LocalizedStrings.PermissionEntriesMissingInFile -f $permissionListCsvPath, $pfidentity)
+                WriteLog -Path $logPath -Level Error -Message ($LocalizedStrings.PermissionEntriesMissingInFile -f $permissionListCsvPath, $pfIdentity)
             } else {
-                WriteLog -Path $logPath -Level Error -Message ($LocalizedStrings.PermissionEntriesMissing -f $pfidentity)
+                WriteLog -Path $logPath -Level Error -Message ($LocalizedStrings.PermissionEntriesMissing -f $pfIdentity)
             }
 
             continue
@@ -429,7 +429,7 @@ try {
 
         $accessRightsOfSpecificUsers = $permissionEntries | Where-Object { !([string]$_.User -eq "Default" -or [string]$_.User -eq "Anonymous") }
         if (!$accessRightsOfSpecificUsers) {
-            WriteLog -Path $logPath -Level Warn -Message ($LocalizedStrings.FolderHasOnlyDefaultPermissions -f $pfidentity, $group)
+            WriteLog -Path $logPath -Level Warn -Message ($LocalizedStrings.FolderHasOnlyDefaultPermissions -f $pfIdentity, $group)
         }
 
         # List of users to be added as owners of the group
@@ -467,7 +467,7 @@ try {
                             # Validate the user in exchange online and add the user to list
                             $isUserTypeInvalid = ValidateAndAddRemoteUserToList -user $userName -smtpAddress $smtpAddress -userType $userType -accessRight $accessRights
                         } else {
-                            # Run Get-Recipient first to get the smtpAdress
+                            # Run Get-Recipient first to get the smtpAddress
                             # smtpAddress will be null in 2010 as ADRecipient object is not available.
                             $isUserTypeInvalid = ValidateAndAddUserToList -user $userName -smtpAddress $smtpAddress -userType $userType -accessRight $accessRights
                         }
