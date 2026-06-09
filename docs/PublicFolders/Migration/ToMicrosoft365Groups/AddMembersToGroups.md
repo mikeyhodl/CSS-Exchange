@@ -13,8 +13,15 @@ AddMembersToGroups.ps1
   [-ArePublicFoldersOnPremises <Boolean>]
   [-ConnectionUri <String>]
   [-WhatIf]
+  [-ScriptUpdateOnly]
+  [-SkipVersionCheck]
   [<CommonParameters>]
 ```
+
+## Parameters
+
+- `-ScriptUpdateOnly` (optional): Only updates the script to the latest released version without performing any other actions.
+- `-SkipVersionCheck` (optional): Skips the automatic version check and script update.
 
 ## Usage
 

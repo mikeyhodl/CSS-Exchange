@@ -7,8 +7,15 @@ Download the latest release: [Sync-ModernMailPublicFolders.ps1](https://github.c
 ```powershell
 Sync-ModernMailPublicFolders.ps1
   [-ExportFile] <String>
+  [-ScriptUpdateOnly]
+  [-SkipVersionCheck]
   [<CommonParameters>]
 ```
+
+## Parameters
+
+- `-ScriptUpdateOnly` (optional): Only updates the script to the latest released version without performing any other actions.
+- `-SkipVersionCheck` (optional): Skips the automatic version check and script update.
 
 ## Usage
 

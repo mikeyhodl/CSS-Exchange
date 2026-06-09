@@ -10,8 +10,22 @@ Move-PublicFolderBranch.ps1
   [-TargetPublicFolderMailbox] <String>
   [-OrganizationName <String>]
   [-WhatIf]
+  [-SkipVersionCheck]
+  [<CommonParameters>]
+
+Move-PublicFolderBranch.ps1
+  -ScriptUpdateOnly
   [<CommonParameters>]
 ```
+
+## Parameters
+
+- `-FolderRoot` (required): The public folder branch to move.
+- `-TargetPublicFolderMailbox` (required): The target public folder mailbox where the contents need to go to.
+- `-OrganizationName` (optional): Name of the organization.
+- `-WhatIf` (optional): Shows what the script would do without making changes.
+- `-ScriptUpdateOnly` (optional): Only updates the script to the latest released version without performing any other actions.
+- `-SkipVersionCheck` (optional): Skips the automatic version check and script update.
 
 ## Usage
 

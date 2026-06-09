@@ -44,30 +44,45 @@
 #
 #    This example shows how to use a different URI to connect to Exchange Online and sync modern mail-public folders from your local deployment.
 #
+# .PARAMETER ScriptUpdateOnly
+#    Only updates the script to the latest released version without performing any other actions.
+#
+# .PARAMETER SkipVersionCheck
+#    Skips the automatic version check and script update.
+#
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [PSCredential] $Credential,
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true, ParameterSetName="Default")]
     [ValidateNotNullOrEmpty()]
     [string] $CsvSummaryFile,
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [ValidateNotNullOrEmpty()]
     [string] $ConnectionUri = "https://outlook.office365.com/powerShell-liveID",
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [bool] $Confirm = $true,
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [switch] $FixInconsistencies = $false,
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [switch] $Force = $false,
 
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
+    [switch] $WhatIf = $false,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ScriptUpdateOnly")]
+    [switch] $ScriptUpdateOnly,
+
     [Parameter(Mandatory=$false)]
-    [switch] $WhatIf = $false
+    [switch] $SkipVersionCheck
 )
+
+. $PSScriptRoot\..\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
 
 # cSpell:words mepf, mepfs, EXOV2, MEPFDNs
 

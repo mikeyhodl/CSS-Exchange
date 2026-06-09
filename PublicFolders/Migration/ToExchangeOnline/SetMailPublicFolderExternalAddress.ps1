@@ -12,17 +12,32 @@
 #    The Confirm switch causes the script to pause processing and requires you to acknowledge what the script will do before processing continues. You don't have to specify
 #    a value with the Confirm switch.
 #
+# .PARAMETER ScriptUpdateOnly
+#    Only updates the script to the latest released version without performing any other actions.
+#
+# .PARAMETER SkipVersionCheck
+#    Skips the automatic version check and script update.
+#
 # .EXAMPLE
 #    .\SetMailPublicFolderExternalAddress.ps1 -ExecutionSummaryFile:summary.csv
 
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param(
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true, ParameterSetName="Default")]
     [ValidateNotNullOrEmpty()]
     [string] $ExecutionSummaryFile,
 
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
+    [bool] $Confirm = $true,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ScriptUpdateOnly")]
+    [switch] $ScriptUpdateOnly,
+
     [Parameter(Mandatory=$false)]
-    [bool] $Confirm = $true
+    [switch] $SkipVersionCheck
 )
+
+. $PSScriptRoot\..\..\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
 
 # cSpell:words mepf, mepfs
 

@@ -38,29 +38,44 @@
 #    The WhatIf switch instructs the script to simulate the actions that it would take on the object. By using the WhatIf switch, you can view what changes would occur
 #    without having to apply any of those changes. You don't have to specify a value with the WhatIf switch.
 #
+# .PARAMETER ScriptUpdateOnly
+#    Only updates the script to the latest released version without performing any other actions.
+#
+# .PARAMETER SkipVersionCheck
+#    Skips the automatic version check and script update.
+#
 # .EXAMPLE
 #    .\UnlockAndRestorePublicFolderProperties.ps1 -BackupDir C:\PFToGroupMigration\ -WhatIf
 #    .\UnlockAndRestorePublicFolderProperties.ps1 -BackupDir C:\PFToGroupMigration -ArePublicFoldersOnPremises $true
 
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [PSCredential] $Credential,
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true, ParameterSetName="Default")]
     [ValidateNotNullOrEmpty()]
     [string] $BackupDir,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Enter '`$true' if public folders are on-premises)")]
+    [Parameter(Mandatory = $false, ParameterSetName="Default", HelpMessage = "Enter '`$true' if public folders are on-premises)")]
     [ValidateNotNullOrEmpty()]
     [bool] $ArePublicFoldersOnPremises = $false,
 
-    [Parameter(Mandatory=$false, HelpMessage = "Enter the Exchange Online remote PowerShell connection uri")]
+    [Parameter(Mandatory=$false, ParameterSetName="Default", HelpMessage = "Enter the Exchange Online remote PowerShell connection uri")]
     [ValidateNotNullOrEmpty()]
     [string] $ConnectionUri = "https://outlook.office365.com/powerShell-liveID",
 
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
+    [switch] $WhatIf = $false,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ScriptUpdateOnly")]
+    [switch] $ScriptUpdateOnly,
+
     [Parameter(Mandatory=$false)]
-    [switch] $WhatIf = $false
+    [switch] $SkipVersionCheck
 )
+
+. $PSScriptRoot\..\..\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
 
 ###################### START OF DEFAULTS ######################
 

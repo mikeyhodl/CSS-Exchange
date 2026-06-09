@@ -35,6 +35,12 @@
 #    The WhatIf switch instructs the script to simulate the actions that it would take on the object. By using the WhatIf switch, you can view what changes would occur
 #    without having to apply any of those changes. You don't have to specify a value with the WhatIf switch.
 #
+# .PARAMETER ScriptUpdateOnly
+#    Only updates the script to the latest released version without performing any other actions.
+#
+# .PARAMETER SkipVersionCheck
+#    Skips the automatic version check and script update.
+#
 # .EXAMPLE
 #    .\AddMembersToGroups.ps1 -MappingCsv PFToGroupMap.csv -ArePublicFoldersLocked $true -BackupDir "C:\PFToGroupMigration\"
 #
@@ -50,32 +56,41 @@
 #
 #    This example shows how to use the 'WhatIf' parameter.
 
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [PSCredential] $Credential,
 
-    [Parameter(Mandatory = $true, HelpMessage = "Mapping csv used to create the migration batch")]
+    [Parameter(Mandatory = $true, ParameterSetName="Default", HelpMessage = "Mapping csv used to create the migration batch")]
     [ValidateNotNullOrEmpty()]
     [string] $MappingCsv,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Enter '`$true' if public folders are locked")]
+    [Parameter(Mandatory = $false, ParameterSetName="Default", HelpMessage = "Enter '`$true' if public folders are locked")]
     [bool] $ArePublicFoldersLocked = $false,
 
-    [Parameter(Mandatory = $true, HelpMessage = "Directory to write log and read permissions of locked public folders from back up file")]
+    [Parameter(Mandatory = $true, ParameterSetName="Default", HelpMessage = "Directory to write log and read permissions of locked public folders from back up file")]
     [ValidateNotNullOrEmpty()]
     [string] $BackupDir,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Enter '`$true' if public folders are on-premises)")]
+    [Parameter(Mandatory = $false, ParameterSetName="Default", HelpMessage = "Enter '`$true' if public folders are on-premises)")]
     [ValidateNotNullOrEmpty()]
     [bool] $ArePublicFoldersOnPremises = $false,
 
-    [Parameter(Mandatory=$false, HelpMessage = "Enter the Exchange Online remote PowerShell connection uri")]
+    [Parameter(Mandatory=$false, ParameterSetName="Default", HelpMessage = "Enter the Exchange Online remote PowerShell connection uri")]
     [ValidateNotNullOrEmpty()]
     [string] $ConnectionUri = "https://outlook.office365.com/powerShell-liveID",
 
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
+    [switch] $WhatIf = $false,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ScriptUpdateOnly")]
+    [switch] $ScriptUpdateOnly,
+
     [Parameter(Mandatory=$false)]
-    [switch] $WhatIf = $false
+    [switch] $SkipVersionCheck
 )
+
+. $PSScriptRoot\..\..\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
 
 # Create a tenant PSSession against Exchange Online using modern auth.
 function InitializeExchangeOnlineRemoteSession() {

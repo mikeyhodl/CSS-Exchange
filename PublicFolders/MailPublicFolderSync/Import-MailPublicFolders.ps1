@@ -17,6 +17,7 @@
 #
 # Import-MailPublicFolders.ps1 -ToCloud
 
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param (
     [Parameter(Mandatory=$false)]
     [PSCredential] $Credential,
@@ -25,8 +26,16 @@ param (
     [Switch] $ToCloud,
 
     [Parameter(Mandatory=$false)]
-    [string] $ConnectionUri = "https://outlook.office365.com/powerShell-liveID"
+    [string] $ConnectionUri = "https://outlook.office365.com/powerShell-liveID",
+
+    [Parameter(Mandatory=$true, ParameterSetName="ScriptUpdateOnly")]
+    [switch] $ScriptUpdateOnly,
+
+    [Parameter(Mandatory=$false)]
+    [switch] $SkipVersionCheck
 )
+
+. $PSScriptRoot\..\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
 
 # Create a tenant PSSession against Exchange Online with modern auth.
 function CreateTenantSession() {

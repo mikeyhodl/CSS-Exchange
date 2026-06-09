@@ -5,10 +5,12 @@
 # Move-PublicFolderBranch.ps1
 #   Moves the contents of folders that reside along with the given folder branch to the target public folder mailbox
 
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param(
     # Folder Branch
     [Parameter(
         Mandatory=$true,
+        ParameterSetName="Default",
         HelpMessage = "Please specify the folder branch to move")]
     [ValidateNotNull()]
     [string] $FolderRoot,
@@ -16,18 +18,27 @@ param(
     # Target Mailbox
     [Parameter(
         Mandatory=$true,
+        ParameterSetName="Default",
         HelpMessage = "Please specify the target public folder mailbox where the contents need to go to")]
     [ValidateNotNull()]
     [string] $TargetPublicFolderMailbox,
 
     # Name of the organization
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [ValidateNotNull()]
     [string] $OrganizationName,
 
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
+    [switch] $WhatIf,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ScriptUpdateOnly")]
+    [switch] $ScriptUpdateOnly,
+
     [Parameter(Mandatory=$false)]
-    [switch] $WhatIf
+    [switch] $SkipVersionCheck
 )
+
+. $PSScriptRoot\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
 
 ################ START OF DEFAULTS ################
 $script:FoldersToMove = @()
