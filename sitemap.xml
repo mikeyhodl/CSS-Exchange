@@ -353,11 +353,19 @@
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
          <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Export-PublicFolderStatistics/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/ManagePublicFolderPermissions/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Move-PublicFolderBranch/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
@@ -377,27 +385,47 @@
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Hybrid/Import-PublicFolderMailboxes/</loc>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/MailPublicFolderSync/Import-MailPublicFolders/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Hybrid/Sync-MailPublicFoldersCloudToOnprem/</loc>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/MailPublicFolderSync/Import-PublicFolderMailboxes/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Migration/Export-ModernPublicFolderStatistics/</loc>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/MailPublicFolderSync/Sync-MailPublicFolders/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Migration/ModernPublicFolderToMailboxMapGenerator/</loc>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/MailPublicFolderSync/Sync-MailPublicFoldersCloudToOnprem/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Migration/SetMailPublicFolderExternalAddress/</loc>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/MailPublicFolderSync/Sync-ModernMailPublicFolders/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Migration/Sync-ModernMailPublicFolders/</loc>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Migration/ToExchangeOnline/Export-ModernPublicFolderStatistics/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Migration/ToExchangeOnline/ModernPublicFolderToMailboxMapGenerator/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Migration/ToExchangeOnline/SetMailPublicFolderExternalAddress/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Migration/ToMicrosoft365Groups/AddMembersToGroups/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Migration/ToMicrosoft365Groups/LockAndSavePublicFolderProperties/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://microsoft.github.io/CSS-Exchange/PublicFolders/Migration/ToMicrosoft365Groups/UnlockAndRestorePublicFolderProperties/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
