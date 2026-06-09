@@ -92,6 +92,8 @@ Import only into folders whose ACL currently contains only `Default` and `Anonym
 - `-BatchSize` (optional): Batch size used for writing progress in export/import. Default is `100`.
 - `-WhatIf` (optional): Shows what actions the script would take (export/import operations) without making any changes.
 - `-Confirm` (optional): Prompts for confirmation before performing each change when importing or modifying permissions.
+- `-ScriptUpdateOnly` (optional): Only updates the script to the latest released version without performing any other actions.
+- `-SkipVersionCheck` (optional): Skips the automatic version check and script update.
 
 ## CSV format
 

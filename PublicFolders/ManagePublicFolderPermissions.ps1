@@ -29,6 +29,12 @@ Switch. When importing, skip folders that already have any permission entries ot
 .PARAMETER File
 Path to the CSV file to read (for import) or write (for export). If not specified during export, a timestamped file name is generated.
 
+.PARAMETER ScriptUpdateOnly
+Switch. Only update the script to the latest released version without performing any other actions.
+
+.PARAMETER SkipVersionCheck
+Switch. Skip the automatic version check and script update.
+
 .EXAMPLE
 .
     .\ManagePublicFolderPermissions.ps1 -Export -Mailbox "PublicFolders" -File PFPerms.csv
@@ -91,10 +97,20 @@ param (
     [Parameter(Mandatory = $false, ParameterSetName = 'Import')]
     [ValidateRange(1, [int]::MaxValue)]
     [int]
-    $BatchSize = 100
+    $BatchSize = 100,
+
+    [Parameter(Mandatory = $true, ParameterSetName = 'ScriptUpdateOnly')]
+    [switch]
+    $ScriptUpdateOnly,
+
+    [Parameter(Mandatory = $false)]
+    [switch]
+    $SkipVersionCheck
 )
 
 begin {
+    . $PSScriptRoot\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
+
     $foldersToProcess = [System.Collections.ArrayList]::new()
 
     $ProgressPreference = 'Continue'

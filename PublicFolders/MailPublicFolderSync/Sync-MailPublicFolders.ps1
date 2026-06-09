@@ -2,12 +2,12 @@
 # Licensed under the MIT License.
 
 # .SYNOPSIS
-#    Syncs modern mail-enabled public folder objects from the local Exchange deployment into O365. It uses the local Exchange deployment
+#    Syncs mail-enabled public folder objects from the local Exchange deployment into O365. It uses the local Exchange deployment
 #    as master to determine what changes need to be applied to O365. The script will create, update or delete mail-enabled public
 #    folder objects on O365 Active Directory when appropriate.
 #
 # .DESCRIPTION
-#    The script must be executed from an Exchange 2013 or later Management Shell window providing access to mail public folders in
+#    The script must be executed from an Exchange 2007 or 2010 Management Shell window providing access to mail public folders in
 #    the local Exchange deployment. Then, using the credentials provided, the script will create a session against Exchange Online,
 #    which will be used to manipulate O365 Active Directory objects remotely.
 #
@@ -35,41 +35,54 @@
 #    without having to apply any of those changes. You don't have to specify a value with the WhatIf switch.
 #
 # .EXAMPLE
-#    .\Sync-ModernMailPublicFolders.ps1 -CsvSummaryFile:sync_summary.csv
+#    .\Sync-MailPublicFolders.ps1 -CsvSummaryFile:sync_summary.csv
 #
 #    This example shows how to sync mail-public folders from your local deployment to Exchange Online. Note that the script outputs a CSV file listing all operations executed, and possibly errors encountered, during sync.
 #
 # .EXAMPLE
-#    .\Sync-ModernMailPublicFolders.ps1 -CsvSummaryFile:sync_summary.csv -ConnectionUri:"https://partner.outlook.cn/PowerShell"
+#    .\Sync-MailPublicFolders.ps1 -CsvSummaryFile:sync_summary.csv -ConnectionUri:"https://partner.outlook.cn/PowerShell"
 #
-#    This example shows how to use a different URI to connect to Exchange Online and sync modern mail-public folders from your local deployment.
+#    This example shows how to use a different URI to connect to Exchange Online and sync mail-public folders from your local deployment.
 #
+# .PARAMETER ScriptUpdateOnly
+#    Only updates the script to the latest released version without performing any other actions.
+#
+# .PARAMETER SkipVersionCheck
+#    Skips the automatic version check and script update.
+#
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [PSCredential] $Credential,
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true, ParameterSetName="Default")]
     [ValidateNotNullOrEmpty()]
     [string] $CsvSummaryFile,
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [ValidateNotNullOrEmpty()]
     [string] $ConnectionUri = "https://outlook.office365.com/powerShell-liveID",
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [bool] $Confirm = $true,
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [switch] $FixInconsistencies = $false,
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [switch] $Force = $false,
 
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
+    [switch] $WhatIf = $false,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ScriptUpdateOnly")]
+    [switch] $ScriptUpdateOnly,
+
     [Parameter(Mandatory=$false)]
-    [switch] $WhatIf = $false
+    [switch] $SkipVersionCheck
 )
 
-# cSpell:words mepf, mepfs, EXOV2, MEPFDNs
+. $PSScriptRoot\..\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
 
 # Writes a dated information message to console
 function WriteInfoMessage() {
@@ -147,21 +160,28 @@ function WriteProgress() {
         -PercentComplete (100 * ($script:itemsProcessed + $statusProcessed)/$script:totalItems)
 }
 
-# Create a tenant PSSession against Exchange Online with modern auth.
+# Create a tenant PSSession against Exchange Online using modern auth.
 function InitializeExchangeOnlineRemoteSession() {
     WriteInfoMessage $LocalizedStrings.CreatingRemoteSession
 
     $oldWarningPreference = $WarningPreference
     $oldVerbosePreference = $VerbosePreference
-
     try {
         Import-Module ExchangeOnlineManagement -ErrorAction SilentlyContinue
         if (Get-Module ExchangeOnlineManagement) {
-            $sessionOption = (New-PSSessionOption -SkipCACheck)
-            Connect-ExchangeOnline -Credential $Credential -ConnectionUri $ConnectionUri -PSSessionOption $sessionOption -Prefix "Remote" -ErrorAction SilentlyContinue
+            $connectParams = @{
+                ConnectionUri = $ConnectionUri
+                Prefix        = "Remote"
+                ErrorAction   = "SilentlyContinue"
+            }
+
+            if ($null -ne $Credential) {
+                $connectParams.Credential = $Credential
+            }
+            Connect-ExchangeOnline @connectParams
             $script:isConnectedToExchangeOnline = $true
         } else {
-            WriteWarningMessage $LocalizedStrings.EXOV2ModuleNotInstalled
+            Write-Warning $LocalizedStrings.EXOV2ModuleNotInstalled
             exit
         }
     } finally {
@@ -197,6 +217,7 @@ function NewMailEnabledPublicFolder() {
     }
 
     try {
+        # Assign to $null to suppress the cmdlet's pipeline output
         $null = &$script:NewSyncMailPublicFolderCommand @newParams
         WriteOperationSummary -folder $localFolder -operation $LocalizedStrings.CreateOperationName -result $LocalizedStrings.CsvSuccessResult -commandText $commandText
 
@@ -410,7 +431,7 @@ function checkForInconsistenciesWithMEPF() {
         $script:mailPublicFoldersDisconnectedFile
     )
 
-    # If there are any inconsistencies with mail-enabled public folders, the ValidateMepf script outputs any of these files
+    # If there are any inconsistencies with mail-enabled public folders, the validatemepf script outputs any of these files
     for ($i = 0; $i -lt $files.Length; $i++) {
         if (Test-Path $files[$i]) {
             return $true
@@ -503,7 +524,7 @@ function RemoveMEPFAndAddEmailAddresses() {
             $emailAddressesToAdd += $emailAddress.ToString()
         }
     }
-    Set-MailPublicFolder $publicFolder -EmailAddresses @{add =$emailAddressesToAdd }
+    Set-MailPublicFolder $publicFolder -EmailAddresses @{add=$emailAddressesToAdd }
 }
 
 ################ DECLARING GLOBAL VARIABLES ################
@@ -570,22 +591,25 @@ ProgressBarStatusUpdating = Updating existing items on Exchange Online: {0}/{1}.
 ProgressBarStatusCreating = Creating new items on Exchange Online: {0}/{1}.
 SyncMailPublicFolderObjectsComplete = Syncing of mail public folder objects into Active Directory completed: {0} objects created, {1} objects updated and {2} objects deleted.
 ErrorsFoundDuringImport = Total errors found: {0}. Please, check the error summary at '{1}' for more information.
+LocalServerVersionNotSupported = You cannot execute this script from your local Exchange server: "{0}". This script can only be executed from Exchange 2007 Management Shell and above.
 ForceParameterRequired = You are about to remove ALL mail-enabled public folders from Exchange Online Active Directory. Only proceed if you do not have any users on Exchange Online already using mail-enabled public folders. Also, make sure your local Exchange deployment doesn't have any mail-enabled public folders by running Get-MailPublicFolder. You can bypass this warning by running the script using the -Force parameter.
-SystemFoldersSkipped = The following {0} mail-enabled public folder(s) will not be synced as they are linked to system public folders. These folders are not applicable for Exchange Online.
-UnableToDetectSystemMailPublicFolders = The script is unable to determine a list of system public folders while the local public folder deployment is locked for migration. This may cause some mail-enabled system public folders to be synced to Exchange Online Active Directory and cause Public Folder migration to fail. If that happens, you can run "Set-MailPublicFolder -IgnoreMissingFolderLink:$true" for each AD object that is a system folder and resume the migration. Note that these system folders don't need to be mail-enabled on Exchange 2013 or later, so it is completely safe to ignore errors reported while mail-enabling them during migration. To learn more about system public folders, please read the following TechNet article: https://technet.microsoft.com/en-us/library/bb397221(v=exchg.151).aspx#Trees.
+SystemFoldersSkipped = The following {0} mail-enabled public folder(s) will not be synced as they are linked to legacy system public folders. These folders are not applicable for Exchange Online.
+UnableToDetectSystemMailPublicFolders = The script is unable to determine a list of legacy system public folders while the local public folder deployment is locked for migration. This may cause some mail-enabled system public folders on the legacy system to be synced to Exchange Online Active Directory and cause Public Folder migration to fail. If that happens, you can run "Set-MailPublicFolder -IgnoreMissingFolderLink:$true" for each AD object that is a legacy system folder and resume the migration. Note that these legacy system folders don't need to be mail-enabled on Exchange 2013 or later, so it is completely safe to ignore errors reported while mail-enabling them during migration. To learn more about legacy system public folders, please read the following TechNet article: https://technet.microsoft.com/en-us/library/bb397221(v=exchg.141).aspx#Trees.
 ValidateMailEnabledPublicFoldersFailed = Validating Mail Enabled Public Folders failed. Continuing to sync Mail Public Folders to Exchange Online.
 DownloadingValidateMEPFScript = Downloading ValidateMailEnabledPublicFolders script...
-DownloadValidateMEPFScriptFailed = Unable to download ValidateMailEnabledPublicFolders script. Download it from https://aka.ms/validatemepf to {0} and execute Sync-ModernMailPublicFolders.ps1 again.
-FoundInconsistenciesWithMEPFs = Found some inconsistencies with mail-enabled public folders. To fix them run Sync-ModernMailPublicFolders.ps1 script with -FixInconsistencies parameter.
+DownloadValidateMEPFScriptFailed = Unable to download ValidateMailEnabledPublicFolders script. Download it from https://aka.ms/validatemepf to {0} and execute Sync-MailPublicFolders.ps1 again.
+FoundInconsistenciesWithMEPFs = Found some inconsistencies with mail-enabled public folders. To fix them run Sync-MailPublicFolders.ps1 script with -FixInconsistencies parameter.
 MailDisablePublicFoldersInFile = Mail disabling public folders mentioned in {0}.
 DeleteOrphanedMailPublicFoldersInFile = Deleting orphaned mail public folders mentioned in {0}.
 DeleteDuplicateMailPublicFoldersInFile = Deleting duplicate mail public folders mentioned in {0}.
 AddAddressesFromDuplicates = Adding email addresses from duplicates...
 MailEnablePublicFoldersWithProxyGUIDinFile = Mail-enabling public folders mentioned in {0}.
 MailEnablePFAssociatedToDisconnectedMEPFsInFile = Resetting MailEnabled and MailRecipientGuid properties of public folders corresponding to disconnected mepfs mentioned in {0}.
-EXOV2ModuleNotInstalled = This script uses modern authentication to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module.
+EXOV2ModuleNotInstalled = This script uses modern authentication to connect to Exchange Online and requires EXO V2 module to be installed. Please follow the instructions at https://docs.microsoft.com/en-us/powershell/exchange/exchange-online-powershell-v2?view=exchange-ps#install-the-exo-v2-module to install EXO V2 module.
 '@
 
+#minimum supported exchange version to run this script
+$minSupportedVersion = 8
 ################ END OF DECLARATION #################
 
 try {
@@ -600,11 +624,19 @@ if (Test-Path $CsvSummaryFile) {
 }
 
 # Write the output CSV headers
+# Assign to $null to suppress the FileInfo object that New-Item returns to the pipeline
 $null = New-Item -Path $CsvSummaryFile -ItemType File -Force -ErrorAction:Stop -Value ("#{0},{1},{2},{3},{4}`r`n" -f $LocalizedStrings.TimestampCsvHeader,
     $LocalizedStrings.IdentityCsvHeader,
     $LocalizedStrings.OperationCsvHeader,
     $LocalizedStrings.ResultCsvHeader,
     $LocalizedStrings.CommandCsvHeader)
+
+$localServerVersion = (Get-ExchangeServer $env:COMPUTERNAME -ErrorAction:Stop).AdminDisplayVersion
+# This script can run from Exchange 2007 Management shell and above
+if ($localServerVersion.Major -lt $minSupportedVersion) {
+    Write-Error ($LocalizedStrings.LocalServerVersionNotSupported -f $localServerVersion) -ErrorAction:Continue
+    exit
+}
 
 try {
     InitializeExchangeOnlineRemoteSession
@@ -614,7 +646,7 @@ try {
     # During finalization, Public Folders deployment is locked for migration, which means the script cannot invoke
     # Get-PublicFolder as that operation would fail. In that case, the script cannot determine which mail public folder
     # objects are linked to system folders under the NON_IPM_SUBTREE.
-    $lockedForMigration = (Get-OrganizationConfig).PublicFolderMailboxesLockedForNewConnections
+    $lockedForMigration = (Get-OrganizationConfig).PublicFoldersLockedForMigration
     $allSystemFoldersInAD = @()
     if (-not $lockedForMigration) {
         # See https://technet.microsoft.com/en-us/library/bb397221(v=exchg.141).aspx#Trees
@@ -633,7 +665,7 @@ try {
 
     if ($script:verbose) {
         WriteVerboseMessage ($LocalizedStrings.SystemFoldersSkipped -f $script:mailEnabledSystemFolders.Count)
-        $allSystemFoldersInAD | Sort-Object Alias | Format-Table -a | Out-String | Write-Host -ForegroundColor Green -BackgroundColor Black
+        $allSystemFoldersInAD | Sort-Object Alias | Format-Table -AutoSize | Out-String | Write-Host -ForegroundColor Green -BackgroundColor Black
     }
 
     $localFolders = @(Get-MailPublicFolder -ResultSize:Unlimited -IgnoreDefaultScope | Sort-Object Guid)

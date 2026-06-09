@@ -10,14 +10,23 @@
 # Import-PublicFolderMailboxes.ps1 -ConnectionUri <cloud url>
 #
 # The above example imports public folder mailbox objects from cloud as mail enabled users to on-premise.
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param (
     [Parameter(Mandatory = $false)]
     [PSCredential] $Credential,
 
     [Parameter(Mandatory = $false)]
     [ValidateNotNull()]
-    [string] $ConnectionUri = "https://outlook.office365.com/powerShell-liveID"
+    [string] $ConnectionUri = "https://outlook.office365.com/powerShell-liveID",
+
+    [Parameter(Mandatory = $true, ParameterSetName = "ScriptUpdateOnly")]
+    [switch] $ScriptUpdateOnly,
+
+    [Parameter(Mandatory = $false)]
+    [switch] $SkipVersionCheck
 )
+
+. $PSScriptRoot\..\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
 
 #cspell:words EXOV2
 
@@ -25,8 +34,16 @@ param (
 function CreateTenantSession() {
     Import-Module ExchangeOnlineManagement -ErrorAction SilentlyContinue
     if (Get-Module ExchangeOnlineManagement) {
-        $sessionOption = (New-PSSessionOption -SkipCACheck)
-        Connect-ExchangeOnline -Credential $Credential -ConnectionUri $ConnectionUri -PSSessionOption $sessionOption -Prefix "Remote" -ErrorAction SilentlyContinue
+        $connectParams = @{
+            ConnectionUri = $ConnectionUri
+            Prefix        = "Remote"
+            ErrorAction   = "SilentlyContinue"
+        }
+
+        if ($null -ne $Credential) {
+            $connectParams.Credential = $Credential
+        }
+        Connect-ExchangeOnline @connectParams
     } else {
         Write-Warning $LocalizedStrings.EXOV2ModuleNotInstalled
         exit

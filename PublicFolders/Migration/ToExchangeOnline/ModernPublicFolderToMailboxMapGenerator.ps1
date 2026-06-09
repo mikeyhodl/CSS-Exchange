@@ -5,22 +5,26 @@
 # ModernPublicFolderToMailboxMapGenerator.ps1
 #    Generates a CSV file that contains the mapping of modern public folder branch to mailbox
 
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param(
     # Mailbox size
     [Parameter(
         Mandatory=$true,
+        ParameterSetName="Default",
         HelpMessage = "Size (in Bytes) of any one of the Public folder mailboxes in destination. (E.g. For 1GB enter 1 followed by nine 0's)")]
     [long] $MailboxSize,
 
     # Mailbox Recoverable item size
     [Parameter(
         Mandatory=$true,
+        ParameterSetName="Default",
         HelpMessage = "Recoverable Item Size (in Bytes) of any one of the Public folder mailboxes in destination. (E.g. For 1GB enter 1 followed by nine 0's)")]
     [long] $MailboxRecoverableItemSize,
 
     # File to import from
     [Parameter(
         Mandatory=$true,
+        ParameterSetName="Default",
         HelpMessage = "This is the path to a CSV formatted file that contains the folder names and their sizes.")]
     [ValidateNotNull()]
     [string] $ImportFile,
@@ -28,10 +32,19 @@ param(
     # File to export to
     [Parameter(
         Mandatory=$true,
+        ParameterSetName="Default",
         HelpMessage = "Full path of the output file to be generated. If only filename is specified, then the output file will be generated in the current directory.")]
     [ValidateNotNull()]
-    [string] $ExportFile
+    [string] $ExportFile,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ScriptUpdateOnly")]
+    [switch] $ScriptUpdateOnly,
+
+    [Parameter(Mandatory=$false)]
+    [switch] $SkipVersionCheck
 )
+
+. $PSScriptRoot\..\..\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
 
 ################ START OF DEFAULTS ################
 

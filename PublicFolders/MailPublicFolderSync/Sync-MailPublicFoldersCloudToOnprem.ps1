@@ -11,18 +11,27 @@
 # Sync-MailPublicFoldersCloudToOnprem.ps1 -ConnectionUri <cloud url> -CsvSummaryFile <path for the summary file>
 #
 # The above example imports new mail public folders objects from Exchange Online as sync mail public folders to on-premise.
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param (
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Default")]
     [PSCredential] $Credential,
 
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $false, ParameterSetName="Default")]
     [ValidateNotNull()]
     [string] $ConnectionUri = "https://outlook.office365.com/powerShell-liveID",
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true, ParameterSetName="Default")]
     [ValidateNotNullOrEmpty()]
-    [string] $CsvSummaryFile
+    [string] $CsvSummaryFile,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ScriptUpdateOnly")]
+    [switch] $ScriptUpdateOnly,
+
+    [Parameter(Mandatory=$false)]
+    [switch] $SkipVersionCheck
 )
+
+. $PSScriptRoot\..\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
 
 # cspell:words EXOV2 MEPF
 
@@ -89,8 +98,16 @@ function InitializeExchangeOnlineRemoteSession() {
     try {
         Import-Module ExchangeOnlineManagement -ErrorAction SilentlyContinue
         if (Get-Module ExchangeOnlineManagement) {
-            $sessionOption = (New-PSSessionOption -SkipCACheck)
-            Connect-ExchangeOnline -Credential $Credential -ConnectionURI $ConnectionUri -PSSessionOption $sessionOption -Prefix "Remote" -ErrorAction SilentlyContinue
+            $connectParams = @{
+                ConnectionUri = $ConnectionUri
+                Prefix        = "Remote"
+                ErrorAction   = "SilentlyContinue"
+            }
+
+            if ($null -ne $Credential) {
+                $connectParams.Credential = $Credential
+            }
+            Connect-ExchangeOnline @connectParams
             $script:isConnectedToExchangeOnline = $true
         } else {
             Write-Warning $LocalizedStrings.EXOV2ModuleNotInstalled

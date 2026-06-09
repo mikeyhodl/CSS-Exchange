@@ -7,8 +7,15 @@ Download the latest release: [Export-ModernPublicFolderStatistics.ps1](https://g
 ```powershell
 Export-ModernPublicFolderStatistics.ps1
   [-ExportFile] <String>
+  [-ScriptUpdateOnly]
+  [-SkipVersionCheck]
   [<CommonParameters>]
 ```
+
+## Parameters
+
+- `-ScriptUpdateOnly` (optional): Only updates the script to the latest released version without performing any other actions.
+- `-SkipVersionCheck` (optional): Skips the automatic version check and script update.
 
 ## Usage
 
