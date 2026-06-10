@@ -8,8 +8,15 @@ Download the latest release: [SetMailPublicFolderExternalAddress.ps1](https://gi
 SetMailPublicFolderExternalAddress.ps1
   [-ExecutionSummaryFile] <String>
   [[-Confirm] <Boolean>]
+  [-ScriptUpdateOnly]
+  [-SkipVersionCheck]
   [<CommonParameters>]
 ```
+
+## Parameters
+
+- `-ScriptUpdateOnly` (optional): Only updates the script to the latest released version without performing any other actions.
+- `-SkipVersionCheck` (optional): Skips the automatic version check and script update.
 
 ## Usage
 

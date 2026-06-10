@@ -21,6 +21,13 @@
     Number of folder statistics results to buffer before writing to the output
     CSV. Must be 1 or greater. Defaults to 5.
 
+.PARAMETER ScriptUpdateOnly
+    Use this switch to only update the script to the latest released version without
+    performing any other actions.
+
+.PARAMETER SkipVersionCheck
+    Use this switch to skip the automatic version check and script update.
+
 .EXAMPLE
     .\Export-PublicFolderStatistics.ps1 -InputFile PublicFoldersToQuery.csv
 
@@ -37,22 +44,32 @@
     - Progress is reported with `Write-Progress` and errors are logged to host.
 #>
 
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param (
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = "Default")]
     [string]
     $InputFile,
 
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $false, ParameterSetName = "Default")]
     [string]
     $OutputFile = "PublicFolderStatistics.csv",
 
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $false, ParameterSetName = "Default")]
     [ValidateRange(1, [int]::MaxValue)]
     [int]
-    $BatchSize = 5
+    $BatchSize = 5,
+
+    [Parameter(Mandatory = $true, ParameterSetName = "ScriptUpdateOnly")]
+    [switch]
+    $ScriptUpdateOnly,
+
+    [Parameter(Mandatory = $false)]
+    [switch]
+    $SkipVersionCheck
 )
+
+. $PSScriptRoot\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
 
 # Import the list of public folders from the specified CSV input file. The
 # CSV is expected to contain a column named 'Identity' with each folder path.

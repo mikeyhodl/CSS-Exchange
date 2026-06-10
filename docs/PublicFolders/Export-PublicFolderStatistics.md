@@ -64,6 +64,9 @@ Example (custom batch size):
   `PublicFolderStatistics.csv`.
 - `-BatchSize` (optional): Number of results buffered before appending to the
   output CSV. Must be 1 or greater. Defaults to `5`.
+- `-ScriptUpdateOnly` (optional): Only updates the script to the latest released
+  version without performing any other actions.
+- `-SkipVersionCheck` (optional): Skips the automatic version check and script update.
 
 ## Input CSV format
 

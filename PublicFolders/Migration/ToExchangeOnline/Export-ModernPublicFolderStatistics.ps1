@@ -5,14 +5,24 @@
 # Export-ModernPublicFolderStatistics.ps1
 #    Generates a CSV file that contains the list of public folders and their individual sizes
 
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param(
     # File to export to
     [Parameter(
         Mandatory=$true,
+        ParameterSetName="Default",
         HelpMessage = "Full path of the output file to be generated. If only filename is specified, then the output file will be generated in the current directory.")]
     [ValidateNotNull()]
-    [string] $ExportFile
+    [string] $ExportFile,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ScriptUpdateOnly")]
+    [switch] $ScriptUpdateOnly,
+
+    [Parameter(Mandatory=$false)]
+    [switch] $SkipVersionCheck
 )
+
+. $PSScriptRoot\..\..\..\Shared\ScriptUpdateFunctions\GenericScriptUpdate.ps1
 
 $ModernPublicFolderStatistics_LocalizedStrings = ConvertFrom-StringData @'
 ProcessingNonIpmSubtree = Enumerating folders under NON_IPM_SUBTREE...

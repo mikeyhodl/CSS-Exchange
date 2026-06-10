@@ -127,7 +127,7 @@ Describe "Testing Health Checker by Mock Data Imports" {
             $httpProxy = GetObject "Http Proxy Setting"
             $httpProxy.ProxyAddress | Should -Be "None"
             TestObjectMatch "Visual C++ 2012 x64" "11.0.61030 Version is current" -WriteType "Green"
-            TestObjectMatch "Visual C++ 2013 x64" "Redistributable (12.0.21005) is outdated" -WriteType "Yellow"
+            TestObjectMatch "Visual C++ 2013 x64" "Redistributable is outdated (12.0.21005). Update the Visual C++ 2013 version." -WriteType "Yellow"
             TestObjectMatch "Server Pending Reboot" $false
 
             $pageFile = GetObject "PageFile Size 0"
@@ -225,7 +225,7 @@ Describe "Testing Health Checker by Mock Data Imports" {
             $cveTests.Contains("CVE-2023-36434") | Should -Be $true
             $cveTests.Contains("CVE-2023-36039") | Should -Be $true
             $cveTests.Contains("ADV24199947") | Should -Be $true
-            $cveTests.Count | Should -Be 63
+            $cveTests.Count | Should -Be 70
             $downloadDomains = GetObject "CVE-2021-1730"
             $downloadDomains.DownloadDomainsEnabled | Should -Be "False"
             TestObjectMatch "Extended Protection Vulnerable" "True" -WriteType "Red"
@@ -239,10 +239,18 @@ Describe "Testing Health Checker by Mock Data Imports" {
 
             # Verify inbound URL rewrite rules are displayed (deduplicated across vDirs)
             $inboundRules = GetObject "Inbound URL Rewrite Rules"
-            $inboundRules.Count | Should -Be 2
+            $inboundRules.Count | Should -Be 3
             $inboundRuleNames = $inboundRules.RewriteRuleName.Value
             $inboundRuleNames | Should -Contain "CVE-2022-41040 Mitigation"
             $inboundRuleNames | Should -Contain "Global Block Bad User Agents"
+            $inboundRuleNames | Should -Contain "Negate Match Test Rule"
+
+            # Verify rules excluded by <remove> in DWS web.config do not appear in detailed display
+            $inboundRuleNames | Should -Not -Contain "AppHost Only Rule"
+
+            # Verify match property resolves correctly when <match> has extra attributes like negate
+            $negateRule = $inboundRules | Where-Object { $_.RewriteRuleName.Value -eq "Negate Match Test Rule" }
+            $negateRule.MatchProperty.Value | Should -Be "url - .*"
 
             # Verify outbound URL rewrite rules are displayed (deduplicated across vDirs)
             $outboundRules = GetObject "Outbound URL Rewrite Rules"

@@ -58,8 +58,8 @@ Describe "Testing Health Checker by Mock Data Imports - Exchange 2016" {
             TestObjectMatch "Power Plan" "Balanced --- Error"-WriteType "Red"
             $httpProxy = GetObject "Http Proxy Setting"
             $httpProxy.ProxyAddress | Should -Be "None"
-            TestObjectMatch "Visual C++ 2012 x64" "Redistributable (11.0.50727) is outdated" -WriteType "Yellow"
-            TestObjectMatch "Visual C++ 2013 x64" "Redistributable (12.0.21005) is outdated" -WriteType "Yellow"
+            TestObjectMatch "Visual C++ 2012 x64" "Redistributable is outdated (11.0.50727). Update the Visual C++ 2012 version." -WriteType "Yellow"
+            TestObjectMatch "Visual C++ 2013 x64" "Redistributable is outdated (12.0.21005). Update the Visual C++ 2013 version." -WriteType "Yellow"
             TestObjectMatch "Server Pending Reboot" $false
 
             $pageFile = GetObject "PageFile Size 0"
@@ -146,11 +146,11 @@ Describe "Testing Health Checker by Mock Data Imports - Exchange 2016" {
             $cveTests.Contains("CVE-2020-1147") | Should -Be $true
             $cveTests.Contains("CVE-2023-36039") | Should -Be $true
             $cveTests.Contains("ADV24199947") | Should -Be $true
-            $cveTests.Count | Should -Be 63
+            $cveTests.Count | Should -Be 70
             $downloadDomains = GetObject "CVE-2021-1730"
             $downloadDomains.DownloadDomainsEnabled | Should -Be "false"
 
-            $Script:ActiveGrouping.Count | Should -Be 71
+            $Script:ActiveGrouping.Count | Should -Be 78
         }
     }
 
