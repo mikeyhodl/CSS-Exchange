@@ -393,13 +393,38 @@ function Get-ServerMonitoringOverride {
     return $null
 }
 
+function Get-TransportService {
+    param($Identity)
+    $data = Import-Clixml "$Script:MockDataCollectionRoot\Exchange\GetTransportService.xml"
+
+    # Deserialized Exchange types (Unlimited<Int32>, etc.) can't be cast to native types
+    # on the original object due to retained type constraints. Build a fresh PSCustomObject
+    # copying all properties, then override the problematic ones with correct types.
+    $fixedProps = @{
+        InternalTransportCertificateThumbprint = [string]$data.InternalTransportCertificateThumbprint
+        MaxPerDomainOutboundConnections        = [int]([string]$data.MaxPerDomainOutboundConnections)
+        MessageRetryInterval                   = [System.TimeSpan]::Parse([string]$data.MessageRetryInterval)
+    }
+
+    $hash = [ordered]@{}
+    foreach ($prop in $data.PSObject.Properties) {
+        if ($fixedProps.ContainsKey($prop.Name)) {
+            $hash[$prop.Name] = $fixedProps[$prop.Name]
+        } else {
+            $hash[$prop.Name] = $prop.Value
+        }
+    }
+
+    return [PSCustomObject]$hash
+}
+
 function Get-AuthServer {
     param(
         [ValidateSet("ACS", "EvoSTS", "All")]
         [string]$Type = "All"
     )
 
-    $returnListObject =  New-Object System.Collections.Generic.List[object]
+    $returnListObject = New-Object System.Collections.Generic.List[object]
 
     $orgId = $((New-Guid).Guid)
     $tenantId = $((New-Guid).Guid)
