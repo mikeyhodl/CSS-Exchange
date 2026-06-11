@@ -1,0 +1,105 @@
+﻿<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04">
+  <Obj RefId="0">
+    <TN RefId="0">
+      <T>System.Management.Automation.PSCustomObject</T>
+      <T>System.Object</T>
+    </TN>
+    <ToString>@{Bias=480; DaylightBias=4294967236; DaylightName=@tzres.dll,-211; DaylightStart=System.Byte[]; StandardBias=0; StandardName=@tzres.dll,-212; StandardStart=System.Byte[]; TimeZoneKeyName=Pacific Standard Time; DynamicDaylightTimeDisabled=0; ActiveTimeBias=420; PSPath=Microsoft.PowerShell.Core\Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TimeZoneInformation; PSParentPath=Microsoft.PowerShell.Core\Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control; PSChildName=TimeZoneInformation; PSDrive=HKLM; PSProvider=Microsoft.PowerShell.Core\Registry}</ToString>
+    <Obj RefId="1">
+      <TNRef RefId="0" />
+      <MS>
+        <I32 N="Bias">480</I32>
+        <U32 N="DaylightBias">4294967236</U32>
+        <S N="DaylightName">@tzres.dll,-211</S>
+        <BA N="DaylightStart">AAADAAIAAgAAAAAAAAAAAA==</BA>
+        <I32 N="StandardBias">0</I32>
+        <S N="StandardName">@tzres.dll,-212</S>
+        <BA N="StandardStart">AAALAAEAAgAAAAAAAAAAAA==</BA>
+        <S N="TimeZoneKeyName">Pacific Standard Time</S>
+        <I32 N="DynamicDaylightTimeDisabled">0</I32>
+        <I32 N="ActiveTimeBias">420</I32>
+        <S N="PSPath">Microsoft.PowerShell.Core\Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TimeZoneInformation</S>
+        <S N="PSParentPath">Microsoft.PowerShell.Core\Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control</S>
+        <S N="PSChildName">TimeZoneInformation</S>
+        <Obj N="PSDrive" RefId="2">
+          <TN RefId="1">
+            <T>System.Management.Automation.PSDriveInfo</T>
+            <T>System.Object</T>
+          </TN>
+          <ToString>HKLM</ToString>
+          <Props>
+            <S N="CurrentLocation"></S>
+            <S N="Name">HKLM</S>
+            <Obj N="Provider" RefId="3">
+              <TN RefId="2">
+                <T>System.Management.Automation.ProviderInfo</T>
+                <T>System.Object</T>
+              </TN>
+              <ToString>Microsoft.PowerShell.Core\Registry</ToString>
+              <Props>
+                <S N="ImplementingType">Microsoft.PowerShell.Commands.RegistryProvider</S>
+                <S N="HelpFile">System.Management.Automation.dll-Help.xml</S>
+                <S N="Name">Registry</S>
+                <S N="PSSnapIn">Microsoft.PowerShell.Core</S>
+                <S N="ModuleName">Microsoft.PowerShell.Core</S>
+                <Nil N="Module" />
+                <S N="Description"></S>
+                <S N="Capabilities">ShouldProcess, Transactions</S>
+                <S N="Home"></S>
+                <Obj N="Drives" RefId="4">
+                  <TN RefId="3">
+                    <T>System.Collections.ObjectModel.Collection`1[[System.Management.Automation.PSDriveInfo, System.Management.Automation, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35]]</T>
+                    <T>System.Object</T>
+                  </TN>
+                  <LST>
+                    <Ref RefId="2" />
+                    <S>HKCU</S>
+                  </LST>
+                </Obj>
+              </Props>
+            </Obj>
+            <S N="Root">HKEY_LOCAL_MACHINE</S>
+            <S N="Description">The configuration settings for the local computer</S>
+            <Nil N="MaximumSize" />
+            <Obj N="Credential" RefId="5">
+              <TN RefId="4">
+                <T>System.Management.Automation.PSCredential</T>
+                <T>System.Object</T>
+              </TN>
+              <ToString>System.Management.Automation.PSCredential</ToString>
+              <Props>
+                <Nil N="UserName" />
+                <Nil N="Password" />
+              </Props>
+            </Obj>
+            <Nil N="DisplayRoot" />
+          </Props>
+          <MS>
+            <Obj N="Used" RefId="6">
+              <TNRef RefId="0" />
+            </Obj>
+            <Ref N="Free" RefId="6" />
+          </MS>
+        </Obj>
+        <Ref N="PSProvider" RefId="3" />
+      </MS>
+    </Obj>
+    <MS>
+      <I32 N="Bias">480</I32>
+      <U32 N="DaylightBias">4294967236</U32>
+      <S N="DaylightName">@tzres.dll,-211</S>
+      <BA N="DaylightStart">AAADAAIAAgAAAAAAAAAAAA==</BA>
+      <I32 N="StandardBias">0</I32>
+      <S N="StandardName">@tzres.dll,-212</S>
+      <BA N="StandardStart">AAALAAEAAgAAAAAAAAAAAA==</BA>
+      <S N="TimeZoneKeyName">Pacific Standard Time</S>
+      <I32 N="DynamicDaylightTimeDisabled">0</I32>
+      <I32 N="ActiveTimeBias">420</I32>
+      <S N="PSPath">Microsoft.PowerShell.Core\Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TimeZoneInformation</S>
+      <S N="PSParentPath">Microsoft.PowerShell.Core\Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control</S>
+      <S N="PSChildName">TimeZoneInformation</S>
+      <Ref N="PSDrive" RefId="2" />
+      <Ref N="PSProvider" RefId="3" />
+    </MS>
+  </Obj>
+</Objs>
