@@ -37,7 +37,7 @@ This page lists emerging issues for Exchange On-Premises deployments, possible r
     [Exchange Server 2019 Cumulative Update 15](https://support.microsoft.com/kb/5042461)
 
     **Issue:** Environments that are using SSL offloading configuration
-    may face issues with Outlook connectivity issues
+    may face Outlook connectivity issues
     after upgrading to [Exchange Server 2019 CU14](https://support.microsoft.com/KB/5035606) OR
     [Exchange Server 2019 Cumulative Update 15](https://support.microsoft.com/kb/5042461).
 
@@ -55,7 +55,7 @@ This page lists emerging issues for Exchange On-Premises deployments, possible r
 ???+ warning "2/6/2025 — Migration Endpoint creation fails via HCW"
     **Update causing the issue:** HCW
 
-    **Issue:** You may see following error when creating Migration Endpoint using HCW:
+    **Issue:** You may see the following error when creating Migration Endpoint using HCW:
 
     `The last connection attempt happened too recently`
 
@@ -66,7 +66,7 @@ This page lists emerging issues for Exchange On-Premises deployments, possible r
     **Update causing the issue:**
     [November Exchange Security Update for Exchange 2016 & Exchange 2019 V2](https://support.microsoft.com/help/5049233)
 
-    **Issue:** You may see following error when installing
+    **Issue:** You may see the following error when installing
     [November 2024 V2 Exchange Security Update](https://support.microsoft.com/topic/description-of-version-2-of-the-security-update-for-microsoft-exchange-server-2019-and-2016-november-27-2024-kb5049233-e807f65d-da39-48a9-9a7e-69612cac8077):
 
     ```
@@ -242,7 +242,7 @@ This page lists emerging issues for Exchange On-Premises deployments, possible r
     **Workaround/Solution:** The latest SUs have been released
     that do not require a workaround to install.
     If you used a workaround to install KB5029388,
-    it is highly recommend to uninstall the KB5029388 to avoid issues down the line.
+    it is highly recommended to uninstall the KB5029388 to avoid issues down the line.
     For more information please check out
     [this KB](https://support.microsoft.com/topic/exchange-server-2019-and-2016-august-2023-security-update-installation-fails-on-non-english-operating-systems-ef38d805-f645-4511-8cc5-cf967e5d5c75).
 
@@ -255,7 +255,7 @@ This page lists emerging issues for Exchange On-Premises deployments, possible r
     Microsoft Exchange Server 2019 or 2016 on servers
     that had January 2023 Security Update
     for Exchange Server installed at any point,
-    the Setup fails with following error message:
+    the Setup fails with the following error message:
 
     ```
     [ERROR] The operation couldn't be performed because object '<ServerName>' couldn't be found on '<DomainControllerName>'.
@@ -273,7 +273,7 @@ This page lists emerging issues for Exchange On-Premises deployments, possible r
 
     `The modified Permissions cannot be changed.`
 
-    **Workaround/Solution:** Install Exchange Security Update June 2023 or higher Security Update
+    **Workaround/Solution:** Install the Exchange Server June 2023 or higher Security Update
     and create the setting override mentioned in
     [this KB](https://support.microsoft.com/topic/extended-protection-doesn-t-support-public-folder-client-permissions-management-through-outlook-bd2037b5-40e0-413a-b368-746b3f5439ee).
 
