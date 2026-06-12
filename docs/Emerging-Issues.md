@@ -77,7 +77,9 @@ This page lists emerging issues for Exchange On-Premises deployments, possible r
     **Workaround/Solution:** Please follow the workaround provided on
     [this KB article](https://aka.ms/NovSUKB).
 
-???+ warning "11/29/2024 — Time zone exception after installing November 2024 SU V2"
+## Old Issues
+
+??? note "11/29/2024 — Time zone exception after installing November 2024 SU V2"
     **Update causing the issue:**
     [November Exchange Security Update for Exchange 2016 & Exchange 2019 V2](https://support.microsoft.com/help/5049233)
 
@@ -98,7 +100,7 @@ This page lists emerging issues for Exchange On-Premises deployments, possible r
     **Workaround/Solution:** Please follow the workaround provided on
     [this KB article](https://support.microsoft.com/topic/time-zone-exception-occurs-after-installing-exchange-server-november-2024-su-version-1-or-version-2-851b3005-6d39-49a9-a6b5-5b4bb42a606f).
 
-???+ warning "11/27/2024 — Transport Rules stop working after November 2024 SU"
+??? note "11/27/2024 — Transport Rules stop working after November 2024 SU"
     **Update causing the issue:**
     [November Exchange Security Update for Exchange 2016 & Exchange 2019](https://support.microsoft.com/help/5044062)
 
@@ -108,7 +110,7 @@ This page lists emerging issues for Exchange On-Premises deployments, possible r
     **Workaround/Solution:** Please install the re-released
     [November 2024 Exchange security update](https://techcommunity.microsoft.com/blog/exchange/re-release-of-november-2024-exchange-server-security-update-packages/4341892).
 
-???+ warning "9/11/2024 — Transport service crashing or Filtering Management Service delayed after August 2024 Windows Update"
+??? note "9/11/2024 — Transport service crashing or Filtering Management Service delayed after August 2024 Windows Update"
     **Update causing the issue:**
     [August 2024 update for Windows](https://support.microsoft.com/kb/5041578)
 
@@ -121,8 +123,6 @@ This page lists emerging issues for Exchange On-Premises deployments, possible r
     [Windows Update for September 2024](https://support.microsoft.com/topic/september-10-2024-kb5043050-os-build-17763-6293-66e9809a-1838-4474-a6a7-90d64f042f00) or later.
 
     ~~Please follow steps in [this KB](https://learn.microsoft.com/windows/release-health/status-windows-10-1809-and-windows-server-2019#3375msgdesc)~~
-
-## Old Issues
 
 ??? note "4/23/2024 — Search in Outlook fails after March 2024 SU"
     **Update causing the issue:**
