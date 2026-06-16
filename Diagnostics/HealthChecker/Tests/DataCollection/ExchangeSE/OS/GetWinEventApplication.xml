@@ -1,4 +1,4 @@
-﻿<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04">
+<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04">
   <Obj RefId="0">
     <TN RefId="0">
       <T>System.Diagnostics.Eventing.Reader.EventLogConfiguration</T>
@@ -374,7 +374,7 @@
       <Nil N="ProviderControlGuid" />
     </Props>
     <MS>
-      <I64 N="FileSize">3215360</I64>
+      <I64 N="FileSize">20975616</I64>
       <B N="IsLogFull">false</B>
       <DT N="LastAccessTime">2026-06-10T12:31:38.4739676-07:00</DT>
       <DT N="LastWriteTime">2026-06-10T12:31:38.4739676-07:00</DT>
