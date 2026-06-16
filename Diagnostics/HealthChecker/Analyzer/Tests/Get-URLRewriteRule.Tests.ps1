@@ -11,7 +11,7 @@ BeforeAll {
     Invoke-Expression $scriptContent
     function Invoke-CatchActions { throw "Called Invoke-CatchActions" }
 
-    $Script:mockDataRoot = "$PSScriptRoot\..\..\Tests\DataCollection\E19\Exchange\IIS"
+    $Script:mockDataRoot = "$PSScriptRoot\..\..\Tests\DataCollection\ExchangeSE\Exchange\IIS"
     [xml]$Script:appHost = Get-Content "$Script:mockDataRoot\applicationHost.config" -Raw -Encoding UTF8
 
     $Script:webConfigContent = @{
