@@ -13,7 +13,7 @@ Describe "Testing Health Checker by Mock Data Imports - Exchange SE" {
         . $PSScriptRoot\HealthCheckerTest.CommonMocks.NotPublished.ps1
     }
 
-    Context "Basic Exchange SE RTM Testing HyperV" {
+    Context "Main" {
         BeforeAll {
             # Windows Server 2025 ships with .NET 4.8.1 - override the CommonMocks default of 4.8
             Mock Get-NETFrameworkVersion {
@@ -234,6 +234,150 @@ Describe "Testing Health Checker by Mock Data Imports - Exchange SE" {
             $globalRulesWarning = GetObject "Global IIS Rewrite Rules"
             $globalRulesWarning | Should -Not -BeNullOrEmpty
         }
+
+        It "HTML Report - HtmlServerValues Structure" {
+            $Script:results.HtmlServerValues.ContainsKey("ServerDetails") | Should -Be $true
+            $Script:results.HtmlServerValues.ContainsKey("OverviewValues") | Should -Be $true
+            $Script:results.HtmlServerValues["ServerDetails"].Count | Should -BeGreaterThan 0
+            $Script:results.HtmlServerValues["OverviewValues"].Count | Should -BeGreaterThan 0
+
+            $firstDetail = $Script:results.HtmlServerValues["ServerDetails"][0]
+            $firstDetail.PSObject.Properties.Name | Should -Contain "Name"
+            $firstDetail.PSObject.Properties.Name | Should -Contain "DetailValue"
+            $firstDetail.PSObject.Properties.Name | Should -Contain "TableValue"
+            $firstDetail.PSObject.Properties.Name | Should -Contain "Class"
+
+            $firstOverview = $Script:results.HtmlServerValues["OverviewValues"][0]
+            $firstOverview.PSObject.Properties.Name | Should -Contain "Name"
+            $firstOverview.PSObject.Properties.Name | Should -Contain "DetailValue"
+
+            # ServerDetails captures most entries while OverviewValues is selective
+            $Script:results.HtmlServerValues["ServerDetails"].Count |
+                Should -BeGreaterThan $Script:results.HtmlServerValues["OverviewValues"].Count
+        }
+
+        It "HTML Report - Overview Values" {
+            $serverName = GetHtmlOverviewValue "Server Name"
+            $serverName | Should -Not -BeNullOrEmpty
+            $serverName.DetailValue | Should -Not -BeNullOrEmpty
+
+            $exchangeVersion = GetHtmlOverviewValue "Exchange Version"
+            $exchangeVersion | Should -Not -BeNullOrEmpty
+            $exchangeVersion.DetailValue | Should -Not -BeNullOrEmpty
+
+            $generationTime = GetHtmlOverviewValue "Generation Time"
+            $generationTime | Should -Not -BeNullOrEmpty
+
+            $vulnDetected = GetHtmlOverviewValue "Vulnerability Detected"
+            $vulnDetected | Should -Not -BeNullOrEmpty
+            if ($vulnDetected.DetailValue -ne "None") {
+                $vulnDetected.Class | Should -Be "Red"
+            }
+        }
+
+        It "HTML Report - ServerDetails CSS Class Mapping" {
+            # Grey write type → empty Class
+            $serverName = GetHtmlServerDetail "Server Name"
+            $serverName | Should -Not -BeNullOrEmpty
+            $serverName.Class | Should -BeNullOrEmpty
+
+            # Yellow write type → Yellow Class
+            $edition = GetHtmlServerDetail "Edition"
+            if ($null -ne $edition) {
+                $edition.Class | Should -Be "Yellow"
+            }
+        }
+
+        It "HTML Report - Security Vulnerabilities HTML Rendering" {
+            # Individual "Security Vulnerability" entries should NOT appear in ServerDetails.
+            # They are rolled up into the "Security Vulnerabilities" summary row.
+            $individualCveEntries = $Script:results.HtmlServerValues["ServerDetails"] |
+                Where-Object { $_.Name -eq "Security Vulnerability" }
+            $individualCveEntries | Should -BeNullOrEmpty
+
+            # The summary row should be present
+            $entry = GetHtmlServerDetail "Security Vulnerabilities"
+            $entry | Should -Not -BeNullOrEmpty
+
+            if ($null -ne $entry -and -not [string]::IsNullOrEmpty($entry.DetailValue)) {
+                $entry.DetailValue | Should -BeLike "*CVE-*"
+                # Validates the fix for the PR #2475 regression: <br> tags must be preserved
+                $entry.DetailValue | Should -Not -BeLike "*&lt;br&gt;*"
+                $entry.DetailValue | Should -BeLike "*<br>*"
+            }
+        }
+
+        It "Data Collection Mock Call Counts" {
+            Assert-MockCalled Get-WmiObjectHandler -Exactly 6 -Scope Context
+            Assert-MockCalled Get-RemoteRegistryValue -Exactly 30 -Scope Context
+            Assert-MockCalled Get-RemoteRegistrySubKey -Exactly 1 -Scope Context
+            Assert-MockCalled Get-NETFrameworkVersion -Exactly 1 -Scope Context
+            Assert-MockCalled Get-DotNetDllFileVersions -Exactly 1 -Scope Context
+            Assert-MockCalled Get-NicPnpCapabilitiesSetting -Exactly 1 -Scope Context
+            Assert-MockCalled Get-NetIPConfiguration -Exactly 1 -Scope Context
+            Assert-MockCalled Get-DnsClient -Exactly 1 -Scope Context
+            Assert-MockCalled Get-NetAdapterRss -Exactly 1 -Scope Context
+            Assert-MockCalled Get-HotFix -Exactly 1 -Scope Context
+            Assert-MockCalled Get-LocalizedCounterSamples -Exactly 2 -Scope Context
+            Assert-MockCalled Get-ServerRebootPending -Exactly 1 -Scope Context
+            Assert-MockCalled Get-AllTlsSettings -Exactly 1 -Scope Context
+            Assert-MockCalled Get-SmbServerConfiguration -Exactly 1 -Scope Context
+            Assert-MockCalled Get-ExchangeAppPoolsInformation -Exactly 1 -Scope Context
+            Assert-MockCalled Get-ExchangeDomainsAclPermissions -Exactly 1 -Scope Context
+            Assert-MockCalled Get-ExchangeAdSchemaClass -Exactly 2 -Scope Context
+            Assert-MockCalled Get-ExchangeServer -Exactly 2 -Scope Context
+            Assert-MockCalled Get-ExchangeCertificate -Exactly 1 -Scope Context
+            Assert-MockCalled Get-AuthConfig -Exactly 1 -Scope Context
+            Assert-MockCalled Get-ExSetupFileVersionInfo -Exactly 1 -Scope Context
+            Assert-MockCalled Get-MailboxServer -Exactly 1 -Scope Context
+            Assert-MockCalled Get-OwaVirtualDirectory -Exactly 1 -Scope Context
+            Assert-MockCalled Get-WebServicesVirtualDirectory -Exactly 1 -Scope Context
+            Assert-MockCalled Get-OrganizationConfig -Exactly 1 -Scope Context
+            Assert-MockCalled Get-HybridConfiguration -Exactly 1 -Scope Context
+            Assert-MockCalled Get-PartnerApplication -Exactly 1 -Scope Context
+            Assert-MockCalled Get-Service -Exactly 2 -Scope Context
+            Assert-MockCalled Get-SettingOverride -Exactly 1 -Scope Context
+            Assert-MockCalled Get-ServerComponentState -Exactly 1 -Scope Context
+            Assert-MockCalled Test-ServiceHealth -Exactly 1 -Scope Context
+            Assert-MockCalled Get-AcceptedDomain -Exactly 1 -Scope Context
+            Assert-MockCalled Get-FIPFSScanEngineVersionState -Exactly 1 -Scope Context
+            Assert-MockCalled Get-ReceiveConnector -Exactly 1 -Scope Context
+            Assert-MockCalled Get-SendConnector -Exactly 1 -Scope Context
+            Assert-MockCalled Get-IISModules -Exactly 1 -Scope Context
+            Assert-MockCalled Get-ExchangeDiagnosticInfo -Exactly 2 -Scope Context
+            Assert-MockCalled Get-ExchangeADSplitPermissionsEnabled -Exactly 1 -Scope Context
+            Assert-MockCalled Get-DynamicDistributionGroup -Exactly 1 -Scope Context
+            Assert-MockCalled Get-ActiveSyncVirtualDirectory -Exactly 1 -Scope Context
+            Assert-MockCalled Get-AutodiscoverVirtualDirectory -Exactly 1 -Scope Context
+            Assert-MockCalled Get-EcpVirtualDirectory -Exactly 1 -Scope Context
+            Assert-MockCalled Get-MapiVirtualDirectory -Exactly 1 -Scope Context
+            Assert-MockCalled Get-OutlookAnywhere -Exactly 1 -Scope Context
+            Assert-MockCalled Get-PowerShellVirtualDirectory -Exactly 1 -Scope Context
+            Assert-MockCalled Get-WindowsFeature -Exactly 1 -Scope Context
+            Assert-MockCalled Get-GlobalMonitoringOverride -Exactly 1 -Scope Context
+            Assert-MockCalled Get-ServerMonitoringOverride -Exactly 1 -Scope Context
+            Assert-MockCalled Get-IRMConfiguration -Exactly 1 -Scope Context
+            Assert-MockCalled Get-ExchangeProtocolContainer -Exactly 1 -Scope Context
+            Assert-MockCalled Get-TransportService -Exactly 1 -Scope Context
+            Assert-MockCalled Get-AuthServer -Exactly 1 -Scope Context
+            Assert-MockCalled Get-WinEvent -Exactly 4 -Scope Context
+            Assert-MockCalled Get-WebSite -Exactly 1 -Scope Context
+            Assert-MockCalled Get-WebConfigFile -Exactly 30 -Scope Context
+            Assert-MockCalled Get-WebApplication -Exactly 1 -Scope Context
+            Assert-MockCalled Get-WebBinding -Exactly 1 -Scope Context
+            Assert-MockCalled GetCachtoknVersionInfo -Exactly 1 -Scope Context
+            Assert-MockCalled GetExchangeServerADInformation -Exactly 1 -Scope Context
+            Assert-MockCalled Get-ExchangeWellKnownSecurityGroups -Exactly 1 -Scope Context
+            Assert-MockCalled Get-HttpProxySetting -Exactly 1 -Scope Context
+            Assert-MockCalled Get-LocalGroupMember -Exactly 1 -Scope Context
+            Assert-MockCalled Get-VisualCRedistributableInstalledVersion -Exactly 1 -Scope Context
+            Assert-MockCalled Get-CimInstance -Exactly 1 -Scope Context
+            Assert-MockCalled Get-Content -Exactly 6 -Scope Context
+            Assert-MockCalled Test-Path -Exactly 5 -Scope Context
+            Assert-MockCalled GetCurrentTimeZone -Exactly 1 -Scope Context
+            Assert-MockCalled GetProcessorCount -Exactly 1 -Scope Context
+            Assert-MockCalled Invoke-DefaultConnectExchangeShell -Exactly 2 -Scope Context
+        }
     }
 
     Context "GetHtmlTextValue Unit Tests" {
@@ -299,16 +443,158 @@ Describe "Testing Health Checker by Mock Data Imports - Exchange SE" {
         }
     }
 
-    Context "Testing Throws" {
+    Context "Testing Scenario 1" {
         BeforeAll {
-            Mock Get-MailboxServer { throw "Pester testing" }
+            # VariantConfiguration3: SDS override changed to Enabled=false in per-server data
+            Mock Get-ExchangeDiagnosticInfo -ParameterFilter { $Process -eq "Microsoft.Exchange.Directory.TopologyService" -and $Component -eq "VariantConfiguration" -and $Argument -eq "Overrides" } `
+                -MockWith { return Import-Clixml "$Script:MockDataCollectionRoot\Exchange\GetExchangeDiagnosticInfo_ADTopVariantConfiguration3.xml" }
 
-            SetDefaultRunOfHealthChecker "Debug_SE_TestingThrow_Results.xml"
+            # PageFile system-managed
+            Mock Get-WmiObjectHandler -ParameterFilter { $Class -eq "Win32_PageFileSetting" } `
+                -MockWith { return Import-Clixml "$Script:MockDataCollectionRoot\OS\Win32_PageFileSystemManaged.xml" }
+
+            # Hybrid configuration basic detection (packed — no conflict with SDS/PageFile tests)
+            Mock Get-HybridConfiguration -MockWith { return Import-Clixml "$Script:MockDataCollectionRoot\Exchange\GetHybridConfiguration.xml" }
+
+            SetDefaultRunOfHealthChecker "Debug_SE_SDS_Disabled_Results.xml"
         }
 
-        It "Verify we still analyze the data from throw Get-MailboxServer" {
-            SetActiveDisplayGrouping "Exchange Information"
-            TestObjectMatch "DAG Name" "Standalone Server"
+        It "SerializedDataSigning Disabled" {
+            SetActiveDisplayGrouping "Security Settings"
+            TestObjectMatch "SerializedDataSigning Enabled" $false -WriteType "Red"
+        }
+
+        It "Hybrid Configuration Detected" {
+            SetActiveDisplayGrouping "Hybrid Information"
+
+            GetObject "Hybrid Configuration Detected" | Should -Be $true
+            GetObject "On-Premises Smart Host Domain" | Should -Be "mail.contoso.com"
+            # cspell:ignore GeoTrust
+            GetObject "TLS Certificate Name" | Should -Be "<I>CN=GeoTrust TLS RSA CA G1, OU=www.contoso.com, O=Contoso CA, C=US<S>CN=mail.contoso.com"
+            GetObject "OAuth between Exchange Server and Microsoft Teams" | Should -Be $false
+            GetObject "LegacySfBPartnerApp" | Should -Be $null # cspell:ignore SfB
+        }
+
+        It "PageFile System-managed" {
+            SetActiveDisplayGrouping "Operating System Information"
+            $pageFile = GetObject "PageFile Size 0"
+            $pageFile.Name | Should -Be ""
+            $pageFile.TotalPhysicalMemory | Should -Be 6144
+            $pageFile.MaxPageSize | Should -Be 0
+            $pageFile.MultiPageFile | Should -Be $false
+            $pageFile.RecommendedPageFile | Should -Be 1536
+
+            $pageFileAdditional = GetObject "PageFile Additional Information"
+            $pageFileAdditional | Should -Be "Error: On Exchange SE RTM, the recommended PageFile size is 25% (1536MB) of the total system memory (6144MB)."
+        }
+    }
+
+    Context "Testing Scenario 2" {
+        BeforeAll {
+            Mock Get-Content -ParameterFilter { $Path -eq "$($env:WINDIR)\System32\inetSrv\config\applicationHost.config" } `
+                -MockWith { return Get-Content "$Script:MockDataCollectionRoot\Exchange\IIS\BadApplicationHost.config" -Raw -Encoding UTF8 }
+            Mock Get-WebApplication -MockWith { throw "Error - Pester" }
+            Mock Get-WebSite -ParameterFilter { $null -eq $Name } -MockWith { throw "Error - Pester" }
+
+            # Multiple PageFiles: one system managed, one static
+            Mock Get-WmiObjectHandler -ParameterFilter { $Class -eq "Win32_PageFileSetting" } `
+                -MockWith { return Import-Clixml "$Script:MockDataCollectionRoot\OS\Win32_MultiplePageFilesOneSystemManaged.xml" }
+
+            # Hybrid app not enabled — SettingOverride returns null (packed — no conflict with IIS/PageFile tests)
+            Mock Get-HybridConfiguration -MockWith { return Import-Clixml "$Script:MockDataCollectionRoot\Exchange\GetHybridConfiguration.xml" }
+            Mock Get-SettingOverride -MockWith { return $null }
+
+            SetDefaultRunOfHealthChecker "Debug_SE_BadAppHost_Results.xml"
+        }
+
+        It "Invalid Application Host Config File Detected" {
+            SetActiveDisplayGrouping "Exchange IIS Information"
+            TestObjectMatch "Invalid Configuration File - Application Host Config File" $true -WriteType "Red"
+            $m = GetObject "Missing Web Application Configuration File"
+            $m | Should -Be $null
+        }
+
+        It "Dedicated Hybrid App Not Enabled Via SettingOverride" {
+            SetActiveDisplayGrouping "Hybrid Information"
+            GetObject "DedicatedHybridAppNotConfigured" | Should -Be $true
+            GetObject "DedicatedHybridAppShowMoreInformation" | Should -Be $true
+        }
+
+        It "PageFiles One System Managed, One Static" {
+            SetActiveDisplayGrouping "Operating System Information"
+            $pageFile1 = GetObject "PageFile Size 0"
+            $pageFile1.Name | Should -Be "c:\pagefile.sys"
+            $pageFile1.TotalPhysicalMemory | Should -Be 6144
+            $pageFile1.MaxPageSize | Should -Be 1536
+            $pageFile1.MultiPageFile | Should -Be $true
+            $pageFile1.RecommendedPageFile | Should -Be 1536
+
+            $pageFile2 = GetObject "PageFile Size 1"
+            $pageFile2.Name | Should -Be "d:\pagefile.sys"
+            $pageFile2.TotalPhysicalMemory | Should -Be 6144
+            $pageFile2.MaxPageSize | Should -Be 0
+            $pageFile2.MultiPageFile | Should -Be $true
+            $pageFile2.RecommendedPageFile | Should -Be 1536
+
+            $pageFileAdditional = GetObject "PageFile Additional Information"
+            $pageFileAdditional | Should -Be "Error: On Exchange SE RTM, the recommended PageFile size is 25% (1536MB) of the total system memory (6144MB)."
+
+            $multiPageFileWarning = GetObject "Multiple PageFile Detected"
+            $multiPageFileWarning | Should -Be $true
+        }
+    }
+
+    Context "Testing Scenario 3" {
+        BeforeAll {
+            Mock Get-WebConfigFile -ParameterFilter { $PSPath -like "IIS:\Sites\Default Web Site*" } -MockWith { return [PSCustomObject]@{ FullName = "$Script:MockDataCollectionRoot\Exchange\IIS\DefaultWebSite_web1.config" } }
+            Mock Get-WebConfigFile -ParameterFilter { $PSPath -eq "IIS:\Sites\Exchange Back End/mapi/emsmdb" } -MockWith { return [PSCustomObject]@{ FullName = "$Script:MockDataCollectionRoot\Exchange\IIS\applicationHost.config" } }
+
+            # Multiple PageFiles: one correct, one oversized
+            Mock Get-WmiObjectHandler -ParameterFilter { $Class -eq "Win32_PageFileSetting" } `
+                -MockWith { return Import-Clixml "$Script:MockDataCollectionRoot\OS\Win32_MultiplePageFilesOneOverSized.xml" }
+
+            # Hybrid with partner app — OAuth detection (packed — no conflict with IIS/PageFile tests)
+            Mock Get-PartnerApplication -MockWith { return Import-Clixml "$Script:MockDataCollectionRoot\Exchange\GetPartnerApplication.xml" }
+
+            SetDefaultRunOfHealthChecker "Debug_SE_BadWebConfig_Results.xml"
+        }
+
+        It "Bad Default Web Site web.config file" {
+            SetActiveDisplayGrouping "Exchange IIS Information"
+            TestObjectMatch "Invalid Configuration File" $true -WriteType "Red"
+            TestObjectMatch "Invalid: $Script:MockDataCollectionRoot\Exchange\IIS\DefaultWebSite_web1.config" $true -WriteType "Red"
+            TestObjectMatch "Missing Web Application Configuration File" $true -WriteType "Red"
+            TestObjectMatch "Web Application: 'Exchange Back End/mapi/emsmdb'" "$Script:MockDataCollectionRoot\Exchange\IIS\applicationHost.config" -WriteType "Red"
+        }
+
+        It "Hybrid Configuration Detected via Partner App" {
+            SetActiveDisplayGrouping "Hybrid Information"
+            GetObject "Hybrid Configuration Detected" | Should -Be $true
+            GetObject "OAuth between Exchange Server and Microsoft Teams" | Should -Be $true
+            GetObject "LegacySfBPartnerApp" | Should -Be $true # cspell:ignore SfB
+        }
+
+        It "PageFiles One Correct, One OverSized" {
+            SetActiveDisplayGrouping "Operating System Information"
+            $pageFile1 = GetObject "PageFile Size 0"
+            $pageFile1.Name | Should -Be "c:\pagefile.sys"
+            $pageFile1.TotalPhysicalMemory | Should -Be 6144
+            $pageFile1.MaxPageSize | Should -Be 1536
+            $pageFile1.MultiPageFile | Should -Be $true
+            $pageFile1.RecommendedPageFile | Should -Be 1536
+
+            $pageFile2 = GetObject "PageFile Size 1"
+            $pageFile2.Name | Should -Be "d:\pagefile.sys"
+            $pageFile2.TotalPhysicalMemory | Should -Be 6144
+            $pageFile2.MaxPageSize | Should -Be 2024
+            $pageFile2.MultiPageFile | Should -Be $true
+            $pageFile2.RecommendedPageFile | Should -Be 1536
+
+            $pageFileAdditional = GetObject "PageFile Additional Information"
+            $pageFileAdditional | Should -Be "Warning: On Exchange SE RTM, the recommended PageFile size is 25% (1536MB) of the total system memory (6144MB)."
+
+            $multiPageFileWarning = GetObject "Multiple PageFile Detected"
+            $multiPageFileWarning | Should -Be $true
         }
     }
 }
