@@ -1,6 +1,7 @@
 ﻿# Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+# PesterPriority: High
 # Scenario testing for Exchange SE - consolidated from E19 scenario patterns
 # Each context packs multiple non-conflicting mock overrides into a single
 # SetDefaultRunOfHealthChecker call to minimize pipeline execution count.
