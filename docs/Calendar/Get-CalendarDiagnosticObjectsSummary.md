@@ -125,7 +125,7 @@ Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID 
 
 Collect all recurring meeting exception dates with default fast collection:
 ```PowerShell
-Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -Exceptions
+Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -AllExceptions
 ```
 
 Use the legacy collector instead of default fast collection:
