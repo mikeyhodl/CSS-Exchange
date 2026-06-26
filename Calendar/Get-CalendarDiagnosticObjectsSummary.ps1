@@ -296,7 +296,7 @@ if (-not ([string]::IsNullOrEmpty($Subject)) ) {
                 Write-Host -ForegroundColor Cyan "The user [$ID] is a Room Mailbox."
             }
 
-            if ($Exceptions.IsPresent) {
+            if ($Exceptions) {
                 CollectExceptionLogs -Identity $ID -MeetingID $MeetingID
             }
 
