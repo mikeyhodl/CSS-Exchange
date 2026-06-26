@@ -87,8 +87,8 @@ function Convert-AppointmentRecurrenceBlobToBytes {
 }
 
 function Get-RecentExceptionCutoff {
-    if ($FastExceptions.IsPresent -and -not $AllExceptions.IsPresent) {
-        return (Get-Date).Date.AddMonths(-6)
+    if (-not $ClassicExceptions.IsPresent -and -not $AllExceptions.IsPresent) {
+        return (Get-Date).Date.AddMonths(-3)
     }
 
     return $null
@@ -308,7 +308,7 @@ function CollectExceptionLogsLegacy {
     $ExceptionLogs = $ExceptionLogs | Where-Object { $_.ItemClass -notlike "IPM.Appointment*" }
     $cutoffDate = Get-RecentExceptionCutoff
     if ($null -ne $cutoffDate) {
-        Write-Host -ForegroundColor Yellow "Filtering legacy Exception logs to only keep items with OriginalStartDate in the last 6 months."
+        Write-Host -ForegroundColor Yellow "Filtering legacy Exception logs to only keep items with OriginalStartDate in the last 3 months."
         $ExceptionLogs = FilterExceptionLogsByRecency -ExceptionLogs $ExceptionLogs
     }
 
@@ -335,8 +335,8 @@ function CollectExceptionLogsFast {
 
     $cutoffDate = Get-RecentExceptionCutoff
     if ($null -ne $cutoffDate) {
-        Write-Host -ForegroundColor Cyan "Keeping only Exception dates from the last 6 months: [$($cutoffDate.ToString('yyyy-MM-dd'))] and newer."
-        Write-Host -ForegroundColor Cyan "[$($exceptionDates.Count)] Exception date(s) match the 6 month time frame."
+        Write-Host -ForegroundColor Cyan "Keeping only Exception dates from the last 3 months: [$($cutoffDate.ToString('yyyy-MM-dd'))] and newer."
+        Write-Host -ForegroundColor Cyan "[$($exceptionDates.Count)] Exception date(s) match the 3 month time frame."
     }
 
     if ($exceptionDates.Count -eq 0) {
@@ -372,7 +372,7 @@ function CollectExceptionLogs {
     Write-Verbose "Meeting IsRecurring: $IsRecurring"
 
     if ($IsRecurring) {
-        if ($FastExceptions.IsPresent -and [string]::IsNullOrEmpty($ExceptionDate)) {
+        if (-not $ClassicExceptions.IsPresent -and [string]::IsNullOrEmpty($ExceptionDate)) {
             try {
                 CollectExceptionLogsFast -Identity $Identity -MeetingID $MeetingID
             } catch {

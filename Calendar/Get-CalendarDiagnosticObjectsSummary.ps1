@@ -48,11 +48,11 @@ Date of the Exception Meeting to collect logs for. Fastest way to get Exceptions
 .PARAMETER NoExceptions
 Do not collect Exception Meetings.  This was the default behavior of the script, now exceptions are collected by default.
 
-.PARAMETER FastExceptions
-Use the AppointmentRecurrenceBlob to find Exception dates, then collect them with -ExceptionDate. Fast exception collection uses the last 6 months by default. If parsing fails, the script falls back to the legacy per-appointment collector.
+.PARAMETER ClassicExceptions
+Use the legacy per-appointment Exception collector instead of the default fast AppointmentRecurrenceBlob-based collector.
 
 .PARAMETER AllExceptions
-When using -FastExceptions, collect all Exception dates instead of the default last 6 months.
+When collecting Exceptions with the default fast mode, collect all Exception dates instead of the default last 3 months.
 
 .EXAMPLE
 Get-CalendarDiagnosticObjectsSummary.ps1 -Identity someuser@microsoft.com -MeetingID 040000008200E00074C5B7101A82E008000000008063B5677577D9010000000000000000100000002FCDF04279AF6940A5BFB94F9B9F73CD
@@ -71,9 +71,9 @@ Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID 
 .EXAMPLE
 Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -ExceptionDate "01/28/2024" -CaseNumber 123456
 .EXAMPLE
-Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -FastExceptions
+Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -AllExceptions
 .EXAMPLE
-Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -FastExceptions -AllExceptions
+Get-CalendarDiagnosticObjectsSummary.ps1 -Identity $Users -MeetingID $MeetingID -ClassicExceptions
 
 .SYNOPSIS
 Used to collect easy to read Calendar Logs.
@@ -112,9 +112,10 @@ param (
     [DateTime]$ExceptionDate,
     [Parameter(HelpMessage = "Do Not collect Exception Meetings.")]
     [switch]$NoExceptions,
-    [Parameter(HelpMessage = "Use AppointmentRecurrenceBlob to collect exceptions by ExceptionDate first, then fall back to the legacy path if parsing fails.")]
-    [switch]$FastExceptions,
-    [Parameter(HelpMessage = "When using FastExceptions, collect all Exception dates instead of the default last 6 months.")]
+    [Parameter(HelpMessage = "Use the legacy per-appointment Exception collector instead of the default fast AppointmentRecurrenceBlob-based collector.")]
+    [Alias('ClassicExeptions')]
+    [switch]$ClassicExceptions,
+    [Parameter(HelpMessage = "When using default fast Exception collection, collect all Exception dates instead of the default last 3 months.")]
     [switch]$AllExceptions,
 
     [Parameter(Mandatory, ParameterSetName = 'Subject', Position = 1, HelpMessage = "Enter the Subject of the meeting. Do not include the RE:, FW:, etc.,  No wild cards (* or ?)")]
@@ -146,6 +147,7 @@ $script:SubjectResolvedMeetingId = $null
 $script:SubjectCanCollectExceptions = $false
 $script:SubjectSkippedExceptionCollection = $false
 $script:ExceptionCollectionStatus = $null
+$script:UserRoles = [ordered]@{}
 
 # ===================================================================================================
 # Support scripts
@@ -172,8 +174,8 @@ if (!$ExportToCSV.IsPresent) {
     . $PSScriptRoot\CalLogHelpers\ExportToExcelFunctions.ps1
 }
 
-if ($AllExceptions.IsPresent -and -not $FastExceptions.IsPresent) {
-    Write-Warning "-AllExceptions only applies when -FastExceptions is used. The switch will be ignored."
+if ($AllExceptions.IsPresent -and $ClassicExceptions.IsPresent) {
+    Write-Warning "-AllExceptions only applies to default fast Exception collection. The switch will be ignored when -ClassicExceptions is used."
 }
 
 # Default to Collecting Tracking Logs (MeetingID only)
@@ -191,12 +193,14 @@ if (-not ([string]::IsNullOrEmpty($MeetingID))) {
         $Exceptions = $true
         Write-Host -ForegroundColor Yellow "Collecting Exceptions."
         Write-Host -ForegroundColor Yellow "`tTo skip collecting Exceptions, use the -NoExceptions switch."
-        if ($FastExceptions.IsPresent) {
-            Write-Host -ForegroundColor Yellow "`tFast exception collection is enabled and will parse AppointmentRecurrenceBlob first."
+        if ($ClassicExceptions.IsPresent) {
+            Write-Host -ForegroundColor Yellow "`tClassic exception collection is enabled and will use the legacy per-appointment path."
+        } else {
+            Write-Host -ForegroundColor Yellow "`tFast exception collection is enabled by default and will parse AppointmentRecurrenceBlob first."
             if ($AllExceptions.IsPresent) {
                 Write-Host -ForegroundColor Yellow "`tAll Exception dates will be collected."
             } else {
-                Write-Host -ForegroundColor Yellow "`tOnly Exception dates from the last 6 months will be collected by default."
+                Write-Host -ForegroundColor Yellow "`tOnly Exception dates from the last 3 months will be collected by default."
             }
         }
     } else {
@@ -215,12 +219,14 @@ if (-not ([string]::IsNullOrEmpty($MeetingID))) {
         $Exceptions = $true
         Write-Host -ForegroundColor Yellow "Using Subject search. Exception collection will run if the search resolves to exactly one MeetingID."
         Write-Host -ForegroundColor Yellow "`tTo skip collecting Exceptions for a single resolved MeetingID, use the -NoExceptions switch."
-        if ($FastExceptions.IsPresent) {
-            Write-Host -ForegroundColor Yellow "`tFast exception collection is enabled for single-MeetingID Subject results."
+        if ($ClassicExceptions.IsPresent) {
+            Write-Host -ForegroundColor Yellow "`tClassic exception collection is enabled for single-MeetingID Subject results."
+        } else {
+            Write-Host -ForegroundColor Yellow "`tFast exception collection is enabled by default for single-MeetingID Subject results."
             if ($AllExceptions.IsPresent) {
                 Write-Host -ForegroundColor Yellow "`tAll Exception dates will be collected."
             } else {
-                Write-Host -ForegroundColor Yellow "`tOnly Exception dates from the last 6 months will be collected by default."
+                Write-Host -ForegroundColor Yellow "`tOnly Exception dates from the last 3 months will be collected by default."
             }
         }
     } else {
@@ -274,16 +280,20 @@ if (-not ([string]::IsNullOrEmpty($Subject)) ) {
         $script:Identity = $ID
         if ($script:GCDO.count -gt 0) {
             Write-Host -ForegroundColor Cyan "Found $($script:GCDO.count) CalLogs with MeetingID [$MeetingID]."
-            $script:IsOrganizer = (SetIsOrganizer -CalLogs $script:GCDO)
-            Write-Host -ForegroundColor Cyan "The user [$ID] $(if ($IsOrganizer) {"IS"} else {"is NOT"}) the Organizer of the meeting."
 
+            # Reset per-user role state before classifying this identity.
+            $script:IsOrganizer = $false
+            $script:IsRoomMB = $null
+            $script:IsDelegateOfOrganizer = $false
+            $script:IsDelegateOfAttendee = $false
+            $script:DelegateForSmtp = $null
+
+            # Determine whether this mailbox is a Room / Equipment. SetIsOrganizer is now
+            # re-run inside BuildCSV (after SMTPs are resolved) so the user/From validation
+            # can correctly exclude Modern-Sharing copies of someone else's data.
             $script:IsRoomMB = (SetIsRoom -CalLogs $script:GCDO)
             if ($script:IsRoomMB) {
                 Write-Host -ForegroundColor Cyan "The user [$ID] is a Room Mailbox."
-            }
-
-            if ($script:IsOrganizer -and (CheckForBifurcation($script:GCDO) -ne $false)) {
-                Write-Host -ForegroundColor Red "Warning: No IPM.Appointment found for the Organizer. CalLogs start to expire after 31 days."
             }
 
             if ($Exceptions.IsPresent) {
@@ -291,6 +301,14 @@ if (-not ([string]::IsNullOrEmpty($Subject)) ) {
             }
 
             BuildCSV
+
+            # IsOrganizer / IsDelegate* are populated by BuildCSV once SMTPs are resolved.
+            Write-Host -ForegroundColor Cyan "The user [$ID] $(if ($script:IsOrganizer) {"IS"} else {"is NOT"}) the Organizer of the meeting."
+
+            if ($script:IsOrganizer -and (CheckForBifurcation($script:GCDO) -ne $false)) {
+                Write-Host -ForegroundColor Red "Warning: No IPM.Appointment found for the Organizer. CalLogs start to expire after 31 days."
+            }
+
             BuildTimeline
         } else {
             Write-Warning "No CalLogs were found for [$ID] with MeetingID [$MeetingID]."
@@ -298,6 +316,12 @@ if (-not ([string]::IsNullOrEmpty($Subject)) ) {
     }
 } else {
     Write-Warning "A valid MeetingID was not found, nor Subject. Please confirm the MeetingID or Subject and try again."
+}
+
+# Cross-user post-pass: if a Delegate-of-Attendee was detected and the attendee they delegate
+# for is also one of the analyzed identities, color that attendee's tab Light Purple.
+if ($ExportToExcel.IsPresent -and $null -ne $script:UserRoles -and $script:UserRoles.Count -gt 0) {
+    Update-AttendeeTabsForDelegates
 }
 
 Write-DashLineBoxColor "Hope this script was helpful in getting and understanding the Calendar Logs.",
