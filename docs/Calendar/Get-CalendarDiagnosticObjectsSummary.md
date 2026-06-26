@@ -50,7 +50,8 @@ Using **-Subject** performs a case-insensitive substring match. Only a single `-
 | **-MeetingID** | The `CleanGlobalObjectId` of the meeting to query. <BR> - Preferred way to get CalLogs. |
 | **-TrackingLogs** | Populate attendee tracking columns in the output. Collected by default; use `-NoTrackingLogs` to skip. <BR> - Only usable with the MeetingID parameter. |
 | **-NoTrackingLogs** | Do not collect Tracking Logs. |
-| **-Exceptions** | When using default fast exception collection, collect **all** exception dates instead of the default last 3 months. |
+| **-Exceptions** | Include Exception objects in the output (exceptions are collected by default for recurring meetings unless `-NoExceptions` is used). |
+| **-AllExceptions** | When using default fast exception collection, collect **all** exception dates instead of the default last 3 months. |
 | **-NoExceptions** | Do not collect Exception Meetings. |
 | **-ExceptionDate** | Date of a specific Exception Meeting to collect logs for. <BR> - Fastest way to get logs for a single occurrence of a recurring meeting. |
 | **-ClassicExceptions** | Use the legacy per-appointment Exception collector instead of the default fast `AppointmentRecurrenceBlob`-based collector. |
