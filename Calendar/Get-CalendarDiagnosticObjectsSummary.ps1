@@ -113,7 +113,6 @@ param (
     [Parameter(HelpMessage = "Do Not collect Exception Meetings.")]
     [switch]$NoExceptions,
     [Parameter(HelpMessage = "Use the legacy per-appointment Exception collector instead of the default fast AppointmentRecurrenceBlob-based collector.")]
-    [Alias('ClassicExeptions')]
     [switch]$ClassicExceptions,
     [Parameter(HelpMessage = "When using default fast Exception collection, collect all Exception dates instead of the default last 3 months.")]
     [switch]$AllExceptions,
