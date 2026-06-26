@@ -4,7 +4,7 @@ Download the latest release: [Get-CalendarDiagnosticObjectsSummary.ps1](https://
 
 This script runs the Get-CalendarDiagnosticObjects cmdlet and returns a summarized timeline of actions in clear English as well as the Calendar Diagnostic Objects in Excel.
 
-> **Exception collection behavior:** Fast exception collection is now the default behavior for recurring meetings. The script parses `AppointmentRecurrenceBlob` to identify exception dates first, then collects those occurrences directly. By default, it collects the last 3 months of exception dates. Add `-Exceptions` to collect every exception date instead. Use `-ClassicExceptions` to force the legacy per-appointment collector.
+> **Exception collection behavior:** Fast exception collection is now the default behavior for recurring meetings. The script parses `AppointmentRecurrenceBlob` to identify exception dates first, then collects those occurrences directly. By default, it collects the last 3 months of exception dates. Add `-AllExceptions` to collect every exception date instead. Use `-ClassicExceptions` to force the legacy per-appointment collector.
 
 ## Prerequisites
 
