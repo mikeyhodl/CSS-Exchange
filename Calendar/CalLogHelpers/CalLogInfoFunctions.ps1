@@ -137,7 +137,7 @@ function SetDelegateRole {
     # Determine whether the user takes action on the shared rows themselves.
     [array] $userChangesOnShared = $sharedRows | Where-Object {
         $_.TriggerAction -in @('Create', 'Update', 'SoftDelete', 'MoveToDeletedItems', 'HardDelete') -and
-        (Test-ResponsibleUserMatchesIdentity -ResponsibleUser $_.ResponsibleUser -Sender $_.Sender -Identity $Identity)
+        (Test-ResponsibleUserMatchesIdentity -ResponsibleUser $_.ResponsibleUser -SenderSmtp $_.Sender -Identity $Identity)
     }
 
     # Resp.* rows that arrived inside the shared folder are the "received all Resp's" signal.
@@ -188,13 +188,13 @@ Compares a ResponsibleUser / Sender SMTP value (from EnhancedCalLogs) to the Ide
 function Test-ResponsibleUserMatchesIdentity {
     param(
         [string] $ResponsibleUser,
-        [string] $Sender,
+        [string] $SenderSmtp,
         [string] $Identity
     )
 
     if ([string]::IsNullOrEmpty($Identity)) { return $false }
 
-    foreach ($value in @($ResponsibleUser, $Sender)) {
+    foreach ($value in @($ResponsibleUser, $SenderSmtp)) {
         if ([string]::IsNullOrEmpty($value) -or $value -eq '-' -or $value -eq 'NotFound') { continue }
         if ([string]::Equals($value.Trim(), $Identity.Trim(), [System.StringComparison]::OrdinalIgnoreCase)) {
             return $true
@@ -217,7 +217,7 @@ function Get-MeetingOrganizerSmtp {
         return $null
     }
 
-    [array] $appointmentFroms = $EnhancedCalLogs |
+    [array] $appointmentFrom = $EnhancedCalLogs |
         Where-Object {
             ($_.ItemClass -eq 'Ipm.Appointment' -or $_.ItemClass -like 'Exception*') -and
             -not [string]::IsNullOrEmpty($_.From) -and
@@ -226,11 +226,11 @@ function Get-MeetingOrganizerSmtp {
         } |
         ForEach-Object { ([string]$_.From).Trim() }
 
-    if ($appointmentFroms.Count -eq 0) {
+    if ($appointmentFrom.Count -eq 0) {
         return $null
     }
 
-    return ($appointmentFroms | Group-Object | Sort-Object Count -Descending | Select-Object -First 1).Name
+    return ($appointmentFrom | Group-Object | Sort-Object Count -Descending | Select-Object -First 1).Name
 }
 
 <#
