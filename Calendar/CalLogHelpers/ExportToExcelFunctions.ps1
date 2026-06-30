@@ -65,15 +65,15 @@ function Get-ExceptionSummaryText {
     switch ($script:ExceptionCollectionStatus) {
         'CollectedFast' {
             if ($AllExceptions.IsPresent) {
-                return "Yes - $exceptionCount exception log(s) collected with FastExceptions for all Exception dates."
+                return "Yes - $exceptionCount exception log(s) collected with default fast exception collection for all Exception dates."
             }
-            return "Yes - $exceptionCount exception log(s) collected with FastExceptions for the last 6 months by default."
+            return "Yes - $exceptionCount exception log(s) collected with default fast exception collection for the last 3 months."
         }
         'CollectedLegacyFallback' {
             if ($AllExceptions.IsPresent) {
-                return "Yes - $exceptionCount exception log(s) collected after FastExceptions fell back to the legacy collector for all Exception dates."
+                return "Yes - $exceptionCount exception log(s) collected after default fast exception collection fell back to the legacy collector for all Exception dates."
             }
-            return "Yes - $exceptionCount exception log(s) collected after FastExceptions fell back to the legacy collector for the last 6 months by default."
+            return "Yes - $exceptionCount exception log(s) collected after default fast exception collection fell back to the legacy collector for the last 3 months."
         }
         'Collected' {
             return "Yes - $exceptionCount exception log(s) collected."
@@ -113,18 +113,21 @@ function Get-CollectionMethodDescription {
         if ($script:SubjectMeetingIdCount -eq 1) {
             if ($script:ExceptionCollectionStatus -eq 'CollectedFast') {
                 if ($AllExceptions.IsPresent) {
-                    return 'Subject search resolved to one MeetingID; Exception data collected with FastExceptions for all Exception dates. Tracking Logs still require -MeetingID.'
+                    return 'Subject search resolved to one MeetingID; Exception data collected with default fast exception collection for all Exception dates. Tracking Logs still require -MeetingID.'
                 }
-                return 'Subject search resolved to one MeetingID; Exception data collected with FastExceptions for the last 6 months by default. Tracking Logs still require -MeetingID.'
+                return 'Subject search resolved to one MeetingID; Exception data collected with default fast exception collection for the last 3 months. Tracking Logs still require -MeetingID.'
             }
             if ($script:ExceptionCollectionStatus -eq 'CollectedLegacyFallback') {
                 if ($AllExceptions.IsPresent) {
-                    return 'Subject search resolved to one MeetingID; FastExceptions failed and the script fell back to the legacy Exception collector for all Exception dates. Tracking Logs still require -MeetingID.'
+                    return 'Subject search resolved to one MeetingID; default fast exception collection failed and the script fell back to the legacy Exception collector for all Exception dates. Tracking Logs still require -MeetingID.'
                 }
-                return 'Subject search resolved to one MeetingID; FastExceptions failed and the script fell back to the legacy Exception collector for the last 6 months by default. Tracking Logs still require -MeetingID.'
+                return 'Subject search resolved to one MeetingID; default fast exception collection failed and the script fell back to the legacy Exception collector for the last 3 months. Tracking Logs still require -MeetingID.'
             }
             if ($script:ExceptionCollectionStatus -eq 'Collected') {
-                return 'Subject search resolved to one MeetingID; Exception data collected by default. Tracking Logs still require -MeetingID.'
+                if ($ClassicExceptions.IsPresent) {
+                    return 'Subject search resolved to one MeetingID; Exception data collected with -ClassicExceptions (legacy path). Tracking Logs still require -MeetingID.'
+                }
+                return 'Subject search resolved to one MeetingID; Exception data collected. Tracking Logs still require -MeetingID.'
             }
             if ($script:ExceptionCollectionStatus -eq 'SkippedBySwitch') {
                 return 'Subject search resolved to one MeetingID; Exception collection was skipped because -NoExceptions was used. Tracking Logs still require -MeetingID.'
@@ -154,18 +157,21 @@ function Get-CollectionMethodDescription {
     }
     if ($script:ExceptionCollectionStatus -eq 'CollectedFast') {
         if ($AllExceptions.IsPresent) {
-            return 'MeetingID search with FastExceptions collection for all Exception dates.'
+            return 'MeetingID search with default fast exception collection for all Exception dates.'
         }
-        return 'MeetingID search with FastExceptions collection for the last 6 months by default.'
+        return 'MeetingID search with default fast exception collection for the last 3 months.'
     }
     if ($script:ExceptionCollectionStatus -eq 'CollectedLegacyFallback') {
         if ($AllExceptions.IsPresent) {
-            return 'MeetingID search where FastExceptions failed and the script fell back to the legacy Exception collector for all Exception dates.'
+            return 'MeetingID search where default fast exception collection failed and the script fell back to the legacy Exception collector for all Exception dates.'
         }
-        return 'MeetingID search where FastExceptions failed and the script fell back to the legacy Exception collector for the last 6 months by default.'
+        return 'MeetingID search where default fast exception collection failed and the script fell back to the legacy Exception collector for the last 3 months.'
     }
     if ($script:ExceptionCollectionStatus -eq 'Collected') {
-        return 'MeetingID search with legacy Exception collection.'
+        if ($ClassicExceptions.IsPresent) {
+            return 'MeetingID search with -ClassicExceptions legacy Exception collection.'
+        }
+        return 'MeetingID search with Exception collection.'
     }
     if ($script:ExceptionCollectionStatus -eq 'NoExceptionDates') {
         return 'MeetingID search where the AppointmentRecurrenceBlob did not expose any matching Exception dates to collect.'
@@ -393,8 +399,7 @@ function GetExcelParams($path, $tabName) {
         $TitleExtra = ", Resource"
         $script:TabColor = [System.Drawing.Color]::FromArgb(112, 173, 71) # Green
     } else {
-        $TableStyle = "Light12" # Light Blue for normal
-        # Dark Blue for Delegates (once we can determine this)
+        $TableStyle = "Light12" # Light Blue for normal Attendee
         $script:TabColor = [System.Drawing.Color]::FromArgb(91, 155, 213) # Blue
     }
 
@@ -406,11 +411,15 @@ function GetExcelParams($path, $tabName) {
     if ($script:SubjectSearch) {
         if ($script:SubjectMeetingIdCount -eq 1) {
             if ($script:ExceptionCollectionStatus -eq "CollectedFast") {
-                $TitleExtra += ", Collected with Subject search and FastExceptions"
+                $TitleExtra += ", Collected with Subject search and default fast exception collection"
             } elseif ($script:ExceptionCollectionStatus -eq "CollectedLegacyFallback") {
-                $TitleExtra += ", Collected with Subject search (FastExceptions fell back to legacy)"
+                $TitleExtra += ", Collected with Subject search (default fast exception collection fell back to legacy)"
             } elseif ($script:ExceptionCollectionStatus -eq "Collected") {
-                $TitleExtra += ", Collected with Subject search and Exception data"
+                if ($ClassicExceptions.IsPresent) {
+                    $TitleExtra += ", Collected with Subject search and -ClassicExceptions (legacy Exception collection)"
+                } else {
+                    $TitleExtra += ", Collected with Subject search and Exception data"
+                }
             } elseif ($script:ExceptionCollectionStatus -eq "SkippedBySwitch") {
                 $TitleExtra += ", Collected with Subject search (-NoExceptions used)"
             } elseif ($script:ExceptionCollectionStatus -eq "SkippedUntilMeetingIdChosen") {
@@ -445,7 +454,7 @@ function GetExcelParams($path, $tabName) {
         ClearSheet              = $true
         Title                   = "Enhanced Calendar Logs for $Identity" + $TitleExtra + " for MeetingID [$($script:GCDO[0].CleanGlobalObjectId)]."
         TitleSize               = 14
-        ConditionalText         = $ConditionalFormatting
+        ConditionalText         = (Get-ConditionalFormattingRules)
     }
 }
 
@@ -502,6 +511,57 @@ function GetExcelColumnNumber {
     return $number
 }
 
+function Get-ConditionalFormattingRules {
+    if (-not (Get-Command -Name New-ConditionalText -ErrorAction SilentlyContinue)) {
+        Write-Verbose "New-ConditionalText is unavailable; skipping Excel conditional formatting rules."
+        return @()
+    }
+
+    return @(
+        # Client, ShortClientInfoString and LogClientInfoString
+        New-ConditionalText "Outlook" -ConditionalTextColor Green -BackgroundColor $null
+        New-ConditionalText "OWA" -ConditionalTextColor DarkGreen -BackgroundColor $null
+        New-ConditionalText "Teams" -ConditionalTextColor DarkGreen -BackgroundColor $null
+        New-ConditionalText "Transport" -ConditionalTextColor Blue -BackgroundColor $null
+        New-ConditionalText "Repair" -ConditionalTextColor DarkRed -BackgroundColor LightPink
+        New-ConditionalText "Other ?BA" -ConditionalTextColor Orange -BackgroundColor $null
+        New-ConditionalText "TimeService" -ConditionalTextColor Orange -BackgroundColor $null
+        New-ConditionalText "Other REST" -ConditionalTextColor DarkRed -BackgroundColor $null
+        New-ConditionalText "Unknown" -ConditionalTextColor DarkRed -BackgroundColor $null
+        New-ConditionalText "ResourceBookingAssistant" -ConditionalTextColor Blue -BackgroundColor $null
+        New-ConditionalText "Calendar Replication" -ConditionalTextColor Blue -BackgroundColor $null
+
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'LogRowType') -ConditionalType ContainsText -Text "Interesting" -ConditionalTextColor Green -BackgroundColor $null
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'LogRowType') -ConditionalType ContainsText -Text "SeriesException" -ConditionalTextColor Green -BackgroundColor $null
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'LogRowType') -ConditionalType ContainsText -Text "DeletedSeriesException" -ConditionalTextColor Orange -BackgroundColor $null
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'LogRowType') -ConditionalType ContainsText -Text "MeetingMessageChange" -ConditionalTextColor Orange -BackgroundColor $null
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'LogRowType') -ConditionalType ContainsText -Text "SyncOrReplication" -ConditionalTextColor Blue -BackgroundColor $null
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'LogRowType') -ConditionalType ContainsText -Text "OtherAssistant" -ConditionalTextColor Orange -BackgroundColor $null
+
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'TriggerAction') -ConditionalType ContainsText -Text "Create" -ConditionalTextColor Green -BackgroundColor $null
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'TriggerAction') -ConditionalType ContainsText -Text "Delete" -ConditionalTextColor Red -BackgroundColor $null
+
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'ItemClass') -ConditionalType ContainsText -Text "IPM.Appointment" -ConditionalTextColor Blue -BackgroundColor $null
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'ItemClass') -ConditionalType ContainsText -Text "Cancellation" -ConditionalTextColor Black -BackgroundColor Orange
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'ItemClass') -ConditionalType ContainsText -Text ".Request" -ConditionalTextColor DarkGreen -BackgroundColor $null
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'ItemClass') -ConditionalType ContainsText -Text ".Resp." -ConditionalTextColor Orange -BackgroundColor $null
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'ItemClass') -ConditionalType ContainsText -Text "IPM.OLE.CLASS" -ConditionalTextColor Plum -BackgroundColor $null
+
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'FreeBusyStatus') -ConditionalType ContainsText -Text "Free" -ConditionalTextColor Red -BackgroundColor $null
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'FreeBusyStatus') -ConditionalType ContainsText -Text "Tentative" -ConditionalTextColor Orange -BackgroundColor $null
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'FreeBusyStatus') -ConditionalType ContainsText -Text "Busy" -ConditionalTextColor Green -BackgroundColor $null
+
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'MeetingRequestType') -ConditionalType ContainsText -Text "Outdated" -ConditionalTextColor DarkRed -BackgroundColor LightPink
+
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'CalendarItemType') -ConditionalType ContainsText -Text "RecurringMaster" -ConditionalTextColor $null -BackgroundColor Plum
+
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'AppointmentAuxiliaryFlags') -ConditionalType ContainsText -Text "Copied" -ConditionalTextColor DarkRed -BackgroundColor LightPink
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'AppointmentAuxiliaryFlags') -ConditionalType ContainsText -Text "ForwardedAppointment" -ConditionalTextColor DarkRed -BackgroundColor $null
+
+        New-ConditionalText -Range (Get-ColumnRange -PropertyName 'ResponseType') -ConditionalType ContainsText -Text "Organizer" -ConditionalTextColor Orange -BackgroundColor $null
+    )
+}
+
 function Get-ColumnRange {
     param(
         [string]$PropertyName,
@@ -523,50 +583,6 @@ function Get-ColumnRange {
         return $col + ":" + $col
     }
 }
-
-$ConditionalFormatting = @(
-    # Client, ShortClientInfoString and LogClientInfoString
-    New-ConditionalText "Outlook" -ConditionalTextColor Green -BackgroundColor $null
-    New-ConditionalText "OWA" -ConditionalTextColor DarkGreen -BackgroundColor $null
-    New-ConditionalText "Teams" -ConditionalTextColor DarkGreen -BackgroundColor $null
-    New-ConditionalText "Transport" -ConditionalTextColor Blue -BackgroundColor $null
-    New-ConditionalText "Repair" -ConditionalTextColor DarkRed -BackgroundColor LightPink
-    New-ConditionalText "Other ?BA" -ConditionalTextColor Orange -BackgroundColor $null
-    New-ConditionalText "TimeService" -ConditionalTextColor Orange -BackgroundColor $null
-    New-ConditionalText "Other REST" -ConditionalTextColor DarkRed -BackgroundColor $null
-    New-ConditionalText "Unknown" -ConditionalTextColor DarkRed -BackgroundColor $null
-    New-ConditionalText "ResourceBookingAssistant" -ConditionalTextColor Blue -BackgroundColor $null
-    New-ConditionalText "Calendar Replication" -ConditionalTextColor Blue -BackgroundColor $null
-
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'LogRowType') -ConditionalType ContainsText -Text "Interesting" -ConditionalTextColor Green -BackgroundColor $null
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'LogRowType') -ConditionalType ContainsText -Text "SeriesException" -ConditionalTextColor Green -BackgroundColor $null
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'LogRowType') -ConditionalType ContainsText -Text "DeletedSeriesException" -ConditionalTextColor Orange -BackgroundColor $null
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'LogRowType') -ConditionalType ContainsText -Text "MeetingMessageChange" -ConditionalTextColor Orange -BackgroundColor $null
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'LogRowType') -ConditionalType ContainsText -Text "SyncOrReplication" -ConditionalTextColor Blue -BackgroundColor $null
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'LogRowType') -ConditionalType ContainsText -Text "OtherAssistant" -ConditionalTextColor Orange -BackgroundColor $null
-
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'TriggerAction') -ConditionalType ContainsText -Text "Create" -ConditionalTextColor Green -BackgroundColor $null
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'TriggerAction') -ConditionalType ContainsText -Text "Delete" -ConditionalTextColor Red -BackgroundColor $null
-
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'ItemClass') -ConditionalType ContainsText -Text "IPM.Appointment" -ConditionalTextColor Blue -BackgroundColor $null
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'ItemClass') -ConditionalType ContainsText -Text "Cancellation" -ConditionalTextColor Black -BackgroundColor Orange
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'ItemClass') -ConditionalType ContainsText -Text ".Request" -ConditionalTextColor DarkGreen -BackgroundColor $null
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'ItemClass') -ConditionalType ContainsText -Text ".Resp." -ConditionalTextColor Orange -BackgroundColor $null
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'ItemClass') -ConditionalType ContainsText -Text "IPM.OLE.CLASS" -ConditionalTextColor Plum -BackgroundColor $null
-
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'FreeBusyStatus') -ConditionalType ContainsText -Text "Free" -ConditionalTextColor Red -BackgroundColor $null
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'FreeBusyStatus') -ConditionalType ContainsText -Text "Tentative" -ConditionalTextColor Orange -BackgroundColor $null
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'FreeBusyStatus') -ConditionalType ContainsText -Text "Busy" -ConditionalTextColor Green -BackgroundColor $null
-
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'MeetingRequestType') -ConditionalType ContainsText -Text "Outdated" -ConditionalTextColor DarkRed -BackgroundColor LightPink
-
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'CalendarItemType') -ConditionalType ContainsText -Text "RecurringMaster" -ConditionalTextColor $null -BackgroundColor Plum
-
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'AppointmentAuxiliaryFlags') -ConditionalType ContainsText -Text "Copied" -ConditionalTextColor DarkRed -BackgroundColor LightPink
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'AppointmentAuxiliaryFlags') -ConditionalType ContainsText -Text "ForwardedAppointment" -ConditionalTextColor DarkRed -BackgroundColor $null
-
-    New-ConditionalText -Range (Get-ColumnRange -PropertyName 'ResponseType') -ConditionalType ContainsText -Text "Organizer" -ConditionalTextColor Orange -BackgroundColor $null
-)
 
 function CheckRows {
     param(
@@ -676,12 +692,13 @@ function SetLogRowTypeFilter {
     $null = $autoFilter.AppendChild($filterCol)
 
     # Hide the actual rows so they appear filtered on open
-    for ($row = $script:firstRow; $row -le $lastDataRow; $row++) {
-        $val = $sheet.Cells[$row, $logRowCol].Text
-        if ($val -in $hideValues) {
-            $sheet.Row($row).Hidden = $true
-        }
-    }
+    # Removed row-hiding logic to ensure no rows are hidden
+    # for ($row = $script:firstRow; $row -le $lastDataRow; $row++) {
+    #     $val = $sheet.Cells[$row, $logRowCol].Text
+    #     if ($val -in $hideValues) {
+    #         $sheet.Row($row).Hidden = $true
+    #     }
+    # }
 }
 
 <#

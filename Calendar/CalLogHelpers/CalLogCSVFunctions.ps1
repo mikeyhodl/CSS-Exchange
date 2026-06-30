@@ -589,7 +589,7 @@ function BuildCSV {
     if ($duplicateCount -gt 0) {
         Write-Host -ForegroundColor Yellow "Removed [$duplicateCount] duplicate Calendar Log entries before processing."
     }
-    $script:GCDO = @($dedupedCalLogs)
+    $script:GCDO = $dedupedCalLogs.ToArray()
     $script:MailboxList = @{}
     # Initialize lookup caches to avoid redundant CN resolution across hundreds of log entries
     $script:SMTPAddressCache = @{}
